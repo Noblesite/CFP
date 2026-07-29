@@ -1,0 +1,10 @@
+The reference images show the SAME physical manufactured object.
+
+Generate the EXACT SAME object viewed from Camera Azimuth $azimuth degrees, Camera Elevation $elevation degrees, and Camera Roll $roll degrees.
+
+Rotate only the camera. The object has not changed.
+
+Do not redesign or artistically reinterpret the object. Preserve geometry, proportions, seams, mechanical joints, color placement, surface details, and manufacturing boundaries.
+
+Use a neutral pose, full-object framing, a centered composition, minimal perspective distortion, a neutral studio background, and even lighting.
+

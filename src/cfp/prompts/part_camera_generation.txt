@@ -1,0 +1,10 @@
+The reference images show the SAME standalone $part_name component.
+
+Generate the EXACT SAME component viewed from Camera Azimuth $azimuth degrees, Camera Elevation $elevation degrees, and Camera Roll $roll degrees.
+
+Rotate only the camera. The object has not changed.
+
+Preserve its geometry, proportions, seams, color placement, visible details, hidden mating geometry, and manufacturing boundaries. Do not add neighboring parts, labels, text, arrows, or mounting hardware.
+
+Present exactly one component against a neutral product-photography background with even lighting and minimal perspective distortion.
+

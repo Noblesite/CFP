@@ -1,0 +1,30 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "the-foundry-cfp"
+version = "0.1.0"
+description = "Workflow engineering tools for The Foundry Character Fabrication Pipeline"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "Proprietary" }
+authors = [{ name = "The Foundry" }]
+dependencies = []
+
+[project.scripts]
+cfp = "cfp.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=8.3"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/cfp"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"src/cfp/prompts" = "cfp/prompts"
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]
+

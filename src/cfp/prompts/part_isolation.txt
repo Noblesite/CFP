@@ -1,0 +1,17 @@
+The two reference images show the SAME manufactured character.
+
+Image 1 is $source_1_identity.
+Image 2 is $source_2_identity.
+
+Generate ONLY the $part_name as a standalone manufactured component.
+
+Remove the rest of the character. Do not include the head, body, neighboring armor, accessories, or any additional parts.
+
+Preserve the target part's visible silhouette, proportions, panel lines, seams, color placement, surface details, and manufacturing boundaries exactly as shown in the references.
+
+Infer hidden geometry and the rear mating surface logically so the result appears to be a complete, physically plausible, manufacturable component that could attach to its parent assembly.
+
+Present exactly one component, centered against a neutral product-photography background with even lighting and minimal perspective distortion.
+
+Do not add labels, text, dimensions, exploded-view arrows, stands, mounting hardware, floating fragments, or artistic reinterpretation.
+
