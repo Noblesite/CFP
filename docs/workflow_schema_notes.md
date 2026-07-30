@@ -90,6 +90,15 @@ The loader therefore keeps the workflow as a generic dictionary. Typed domain
 objects describe CFP edit intent; they do not normalize the whole ComfyUI
 schema.
 
+## Optional definitions
+
+ComfyUI 0.4 workflows without subgraphs may omit `definitions` entirely. The
+downloaded TRELLIS2 examples use that form. Loading, inspection, and validation
+must not add an empty `definitions` object as a side effect.
+
+Builders that append a subgraph create `definitions.subgraphs` explicitly
+through a mutating operation.
+
 ## Current validation boundary
 
 The first validator checks:
@@ -106,4 +115,3 @@ The first validator checks:
 It does not attempt to validate widget semantics, model availability, ComfyUI
 execution order, visual group containment, or whether a prompt actually
 produces the requested camera angle.
-

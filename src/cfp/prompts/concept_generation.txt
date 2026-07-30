@@ -1,0 +1,11 @@
+Transform the referenced armored character into a clean full-body collectible figure concept intended for multipart FDM 3D printing.
+
+Preserve the helmet silhouette, faceplate, chest reactor, armor proportions, red-and-gold color layout, shoulders, forearms, thigh armor, boots, and mechanical design language.
+
+Place the character in a neutral symmetrical A-pose, with the arms slightly separated from the torso, straight legs, complete visible hands, and both feet fully visible.
+
+Create clean armor panel seams and clear physical boundaries between red armor, gold armor, dark mechanical joints, illuminated eyes, and the chest reactor. Make the color boundaries follow plausible separately manufactured parts.
+
+Use a plain neutral studio background, even lighting, centered full-body composition, minimal perspective distortion, and no dramatic foreshortening.
+
+Do not add weapons, accessories, text, smoke, effects, battle damage, an exposed face, or a dramatic action pose.

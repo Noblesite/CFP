@@ -54,6 +54,13 @@ class Workflow:
 
     @property
     def subgraphs(self) -> list[dict[str, Any]]:
+        definitions = self.data.get("definitions")
+        if not isinstance(definitions, dict):
+            return []
+        subgraphs = definitions.get("subgraphs")
+        return subgraphs if isinstance(subgraphs, list) else []
+
+    def ensure_subgraphs(self) -> list[dict[str, Any]]:
         definitions = self.data.setdefault("definitions", {})
         return definitions.setdefault("subgraphs", [])
 
@@ -92,4 +99,3 @@ class Workflow:
             "last_node_id": self.data.get("last_node_id"),
             "last_link_id": self.data.get("last_link_id"),
         }
-

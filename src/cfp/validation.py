@@ -30,7 +30,7 @@ def validate_workflow(workflow: Workflow) -> ValidationReport:
     report = ValidationReport()
     data = workflow.data
 
-    required = ("nodes", "links", "groups", "definitions", "last_node_id", "last_link_id")
+    required = ("nodes", "links", "groups", "last_node_id", "last_link_id")
     for field in required:
         if field not in data:
             report.add(
@@ -266,4 +266,3 @@ def _validate_subgraph(
                 f"Subgraph '{name}' link {link.get('id')} has invalid target slot",
                 f"subgraphs[{name}].links[{index}]",
             )
-

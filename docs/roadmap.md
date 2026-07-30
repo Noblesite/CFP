@@ -10,6 +10,8 @@
 - Wrap the builder for part isolation.
 - Emit a change report.
 - Provide `validate`, `inspect`, and `append-part-isolation`.
+- Accept workflows that omit `definitions` when they contain no subgraphs.
+- Preserve downloaded TRELLIS2 workflows as external structural references.
 
 ## Next engineering slices
 
@@ -18,8 +20,10 @@
    baseline and document intentional differences.
 3. Add a canonical Kontext subgraph template independent of CFP-02.
 4. Add a camera-stage wrapper using `CFP_TURNTABLE_V1`.
-5. Add machine-readable human-review contracts without automating approval.
-6. Add a small project manifest after documenting JSON, TOML, and YAML
+5. Define the first reconstruction adapter against the documented,
+   model-agnostic contract.
+6. Add machine-readable human-review contracts without automating approval.
+7. Add a small project manifest after documenting JSON, TOML, and YAML
    tradeoffs.
 
 ## Later pipeline stages
@@ -40,4 +44,3 @@ CFP-10 Export
 
 No later stage should weaken deterministic transformation, human inspection, or
 source-artifact preservation.
-

@@ -2,10 +2,178 @@ from __future__ import annotations
 
 import copy
 import uuid
+from collections.abc import Mapping
 from typing import Any
 
 from cfp.models import ChangeReport, NodeOutputRef
 from cfp.workflow import Workflow
+
+LEGACY_SWAN_PROMPT = (
+    "Using this elegant style, create a portrait of a swan wearing a pearl "
+    "tiara and lace collar, maintaining the same refined quality and soft "
+    "color tones."
+)
+
+
+def _widget_value(node: dict[str, Any], input_name: str) -> Any | None:
+    """Return the serialized widget value associated with a named node input."""
+    widget_index = 0
+    values = node.get("widgets_values", [])
+    for item in node.get("inputs", []):
+        if not isinstance(item.get("widget"), dict):
+            continue
+        if item.get("name") == input_name:
+            return values[widget_index] if widget_index < len(values) else None
+        widget_index += 1
+    return None
+
+
+def _set_widget_value(
+    node: dict[str, Any],
+    input_name: str,
+    value: Any,
+) -> bool:
+    """Set a named widget value while preserving every unrelated widget."""
+    widget_index = 0
+    values = node.setdefault("widgets_values", [])
+    for item in node.get("inputs", []):
+        if not isinstance(item.get("widget"), dict):
+            continue
+        if item.get("name") == input_name:
+            while len(values) <= widget_index:
+                values.append(None)
+            changed = values[widget_index] != value
+            values[widget_index] = value
+            return changed
+        widget_index += 1
+    return False
+
+
+def _set_subgraph_input_widget(
+    definition: dict[str, Any],
+    input_name: str,
+    value: Any,
+) -> bool:
+    """Synchronize the fallback widget reached by a subgraph input link."""
+    inputs = definition.get("inputs", [])
+    input_slot = next(
+        (index for index, item in enumerate(inputs) if item.get("name") == input_name),
+        None,
+    )
+    if input_slot is None:
+        return False
+
+    input_node_id = definition.get("inputNode", {}).get("id", -10)
+    target: tuple[int, int] | None = None
+    for link in definition.get("links", []):
+        if isinstance(link, dict):
+            if (
+                link.get("origin_id") == input_node_id
+                and link.get("origin_slot") == input_slot
+            ):
+                target = (link.get("target_id"), link.get("target_slot"))
+                break
+        elif (
+            isinstance(link, list)
+            and len(link) >= 6
+            and link[1] == input_node_id
+            and link[2] == input_slot
+        ):
+            target = (link[3], link[4])
+            break
+
+    if target is None:
+        return False
+    target_id, target_slot = target
+    target_node = next(
+        (node for node in definition.get("nodes", []) if node.get("id") == target_id),
+        None,
+    )
+    if target_node is None:
+        return False
+    target_inputs = target_node.get("inputs", [])
+    if not isinstance(target_slot, int) or target_slot >= len(target_inputs):
+        return False
+    return _set_widget_value(
+        target_node,
+        target_inputs[target_slot].get("name", input_name),
+        value,
+    )
+
+
+def _remove_broken_text_quarantine(node: dict[str, Any]) -> bool:
+    """Remove the obsolete proxy entry that restores the template prompt."""
+    properties = node.get("properties")
+    if not isinstance(properties, dict):
+        return False
+    quarantine = properties.get("proxyWidgetErrorQuarantine")
+    if not isinstance(quarantine, list):
+        return False
+
+    kept = [
+        entry
+        for entry in quarantine
+        if not (
+            isinstance(entry, dict)
+            and isinstance(entry.get("originalEntry"), list)
+            and entry["originalEntry"]
+            and entry["originalEntry"][-1] == "text"
+        )
+    ]
+    if len(kept) == len(quarantine):
+        return False
+    if kept:
+        properties["proxyWidgetErrorQuarantine"] = kept
+    else:
+        properties.pop("proxyWidgetErrorQuarantine", None)
+    return True
+
+
+def synchronize_kontext_prompts(
+    workflow: Workflow,
+    *,
+    prompt_overrides: Mapping[int, str] | None = None,
+) -> ChangeReport:
+    """Make each Kontext subgraph's internal fallback match its outer prompt."""
+    definitions = {item.get("id"): item for item in workflow.subgraphs}
+    updated: list[str] = []
+    unresolved: list[int] = []
+
+    for node in workflow.nodes:
+        definition = definitions.get(node.get("type"))
+        if definition is None:
+            continue
+        input_names = [item.get("name") for item in node.get("inputs", [])]
+        if input_names[:2] != ["image1", "image2"] or "text" not in input_names:
+            continue
+
+        node_id = node.get("id")
+        prompt = _widget_value(node, "text")
+        if (
+            prompt_overrides is not None
+            and isinstance(node_id, int)
+            and node_id in prompt_overrides
+        ):
+            prompt = prompt_overrides[node_id]
+        if not isinstance(prompt, str):
+            continue
+        if prompt == LEGACY_SWAN_PROMPT:
+            if isinstance(node_id, int):
+                unresolved.append(node_id)
+            continue
+        outer_changed = _set_widget_value(node, "text", prompt)
+        changed = _set_subgraph_input_widget(definition, "text", prompt)
+        changed = _remove_broken_text_quarantine(node) or changed
+        changed = outer_changed or changed
+        if changed:
+            updated.append(
+                f"Node {node.get('id')}: synchronized Kontext text prompt"
+            )
+
+    return ChangeReport(
+        updated=updated,
+        details={"unresolved_template_prompt_nodes": unresolved},
+    )
 
 
 def _template_generation_node(workflow: Workflow) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -97,6 +265,7 @@ def append_kontext_stage(
     if not preview and not save:
         raise ValueError("A stage must create at least one preview or save output")
 
+    synchronize_kontext_prompts(workflow)
     template_node, template_definition = _template_generation_node(workflow)
     generation_id = workflow.next_node_id()
     stage_uuid = str(
@@ -108,7 +277,8 @@ def append_kontext_stage(
     definition = copy.deepcopy(template_definition)
     definition["id"] = stage_uuid
     definition["name"] = stage_name
-    workflow.subgraphs.append(definition)
+    _set_subgraph_input_widget(definition, "text", prompt)
+    workflow.ensure_subgraphs().append(definition)
 
     generation = copy.deepcopy(template_node)
     generation["id"] = generation_id
@@ -120,6 +290,7 @@ def append_kontext_stage(
     for item in generation.get("outputs", []):
         item["links"] = []
     generation["widgets_values"] = [prompt, seed]
+    _remove_broken_text_quarantine(generation)
 
     max_order = max((node.get("order", 0) for node in workflow.nodes), default=0)
     generation["order"] = max_order + 1
@@ -224,4 +395,3 @@ def append_kontext_stage(
             "group_ids": [group_id, group_id + 1],
         },
     )
-

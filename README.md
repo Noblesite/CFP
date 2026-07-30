@@ -14,6 +14,11 @@ The first milestone can:
 - wrap that stage as a component-isolation operation;
 - save a new, reviewable workflow without overwriting its source.
 
+The repository also contains an experimental Apple-Silicon reconstruction
+adapter in `comfyui_trellis2_mlx/`. It wraps the native Swift/MLX TRELLIS.2
+engine and exposes a ComfyUI `FILE_3D_GLB` output for the proven 512-resolution
+single-image lane.
+
 It does not execute ComfyUI, segment images, reconstruct meshes, control
 Blender, or run autonomous retry loops.
 
@@ -48,6 +53,27 @@ uv run cfp append-part-isolation \
 The source file is never overwritten unless `--in-place` is explicitly used.
 An edit is not saved when it introduces validation errors.
 
+Repair legacy FLUX Kontext subgraphs whose hidden CLIP widget or quarantined
+proxy value still contains the template prompt:
+
+```bash
+uv run cfp repair-kontext-prompts \
+  --workflow path/to/workflow.json \
+  --in-place
+```
+
+The repair treats the visible outer-node prompt as authoritative, synchronizes
+the nested `CLIPTextEncode` fallback, and removes only the obsolete quarantined
+`text` proxy entry. If ComfyUI has already replaced the visible prompt with the
+legacy template value, restore it from a known-good workflow:
+
+```bash
+uv run cfp repair-kontext-prompts \
+  --workflow path/to/workflow.json \
+  --prompt-source tests/fixtures/CFP-02.json \
+  --in-place
+```
+
 ## Repository map
 
 ```text
@@ -56,8 +82,9 @@ src/cfp/builders/        Reusable graph transformations
 src/cfp/prompts/         Editable prompt templates packaged with the CLI
 tests/fixtures/          Immutable source workflow fixtures
 tests/                   Automated graph and round-trip tests
-examples/                Generated, reviewable workflow outputs
+examples/                Generated outputs and downloaded references
 docs/                    Architecture and schema notes
+comfyui_trellis2_mlx/    Native macOS Swift/MLX ComfyUI custom node
 ```
 
 The currently available fixture is preserved byte-for-byte:
@@ -74,6 +101,18 @@ directories during repository initialization. It has not been fabricated or
 misrepresented as a supplied fixture. The programmatically generated example
 in `examples/` is a new artifact.
 
+Two downloaded TRELLIS2 workflows are preserved as external reference fixtures:
+
+```text
+examples/downloaded_examples/High_Quality_GGUF.json
+examples/downloaded_examples/Trellis2Multiviews_GGUF.json
+```
+
+They are not CFP baselines and are not expected to run in the current ComfyUI
+installation. Their structural lessons and compatibility requirements are
+documented in
+[downloaded_trellis2_examples.md](docs/downloaded_trellis2_examples.md).
+
 ## Design rule
 
 The recurring camera-generation contract is:
@@ -83,3 +122,6 @@ The recurring camera-generation contract is:
 See [camera_convention.md](docs/camera_convention.md) for the coordinate
 contract used by filenames, prompts, metadata, and future tests.
 
+See [reconstruction_contract.md](docs/reconstruction_contract.md) for the
+model-agnostic boundary between approved camera artifacts and future 3D
+reconstruction adapters.
