@@ -15,6 +15,8 @@ memory-budget and deterministic-seed CLI patch before building.
 - 512 reconstruction tier;
 - deterministic seed;
 - optional ComfyUI mask converted to PNG alpha;
+- genuine multi-view conditioning through separate 000°, 090°, 180°, and
+  optional 270° images;
 - textured GLB output compatible with ComfyUI's `Preview 3D` and
   `Save 3D Model` nodes.
 
@@ -41,6 +43,12 @@ TRELLIS.2 MLX Image to 3D
         +--> TRELLIS.2 MLX Mesh Report
 ```
 
+For an approved model sheet, use `TRELLIS.2 MLX Multi-View to 3D`. The node
+requires the 000° front view and accepts optional 090°, 180°, and 270° views.
+Each image is preprocessed and encoded independently by DINOv3; the ordered
+token sets are concatenated into one TRELLIS.2 conditioning context. Supply
+separate aligned images rather than a flattened contact sheet.
+
 `TRELLIS.2 MLX Mesh Report` is a read-only post-generation checkpoint. It
 reports vertex and triangle counts, connected components, boundary and
 non-manifold edges, watertightness, bounding-box dimensions, artifact path,
@@ -66,6 +74,7 @@ The CFP development install also places it under:
 ```text
 ComfyUI/user/default/workflows/CFP/CFP_TRELLIS2_MLX_Image_to_3D_v001.json
 ComfyUI/user/default/workflows/CFP/CFP_TRELLIS2_MLX_Background_Clean_v001.json
+ComfyUI/user/default/workflows/CFP/CFP_TRELLIS2_MLX_MultiView_v001.json
 ```
 
 ## RMBG-2.0 model metadata

@@ -50,6 +50,87 @@ def _save_input_image(image, mask, path: Path) -> None:
     Image.fromarray(rgba, mode="RGBA").save(path)
 
 
+def _run_generation(
+    *,
+    mlx_config: Trellis2MLXConfig,
+    views: list[tuple[int, object, object | None]],
+    seed: int,
+    steps: int,
+    matting: str,
+):
+    temp_directory = Path(folder_paths.get_temp_directory())
+    temp_directory.mkdir(parents=True, exist_ok=True)
+    run_id = uuid.uuid4().hex
+    output_path = temp_directory / f"trellis2_mlx_{run_id}.glb"
+    metrics_path = temp_directory / f"trellis2_mlx_{run_id}_metrics.json"
+    manifest_path = temp_directory / f"trellis2_mlx_{run_id}_views.json"
+    input_paths: list[Path] = []
+
+    try:
+        for angle, image, mask in views:
+            input_path = temp_directory / f"trellis2_mlx_{run_id}_{angle:03d}.png"
+            _save_input_image(image, mask, input_path)
+            input_paths.append(input_path)
+
+        additional_manifest = None
+        if len(input_paths) > 1:
+            manifest_path.write_text(
+                json.dumps([str(path) for path in input_paths[1:]]),
+                encoding="utf-8",
+            )
+            additional_manifest = manifest_path
+
+        environment = build_environment(
+            dict(os.environ),
+            config=mlx_config,
+            image_path=input_paths[0],
+            output_path=output_path,
+            metrics_path=metrics_path,
+            seed=seed,
+            steps=steps,
+            use_matting=matting == "on",
+            additional_views_manifest=additional_manifest,
+        )
+
+        comfy.model_management.unload_all_models()
+        comfy.model_management.soft_empty_cache(force=True)
+        progress = comfy.utils.ProgressBar(100)
+
+        def on_log(line: str) -> None:
+            log.info("[engine] %s", line)
+            if "prepare OK" in line:
+                progress.update_absolute(25)
+            elif "[engine] tier:" in line:
+                progress.update_absolute(30)
+            elif "[engine] run OK" in line:
+                progress.update_absolute(95)
+            elif "[engine] wrote GLB" in line:
+                progress.update_absolute(100)
+
+        metrics, engine_log = run_engine(
+            config=mlx_config,
+            environment=environment,
+            output_path=output_path,
+            metrics_path=metrics_path,
+            on_log=on_log,
+            check_cancelled=comfy.model_management.throw_exception_if_processing_interrupted,
+        )
+        metrics["input_view_count"] = len(views)
+        metrics["input_view_angles"] = [angle for angle, _, _ in views]
+    finally:
+        for input_path in input_paths:
+            input_path.unlink(missing_ok=True)
+        manifest_path.unlink(missing_ok=True)
+
+    return IO.NodeOutput(
+        Types.File3D(str(output_path), file_format="glb"),
+        str(output_path),
+        json.dumps(metrics, indent=2, sort_keys=True),
+        engine_log,
+        metrics["artifact_sha256"],
+    )
+
+
 class Trellis2MLXModel(IO.ComfyNode):
     @classmethod
     def define_schema(cls):
@@ -151,58 +232,83 @@ class Trellis2MLXImageTo3D(IO.ComfyNode):
         matting: str,
         mask=None,
     ):
-        temp_directory = Path(folder_paths.get_temp_directory())
-        temp_directory.mkdir(parents=True, exist_ok=True)
-        run_id = uuid.uuid4().hex
-        input_path = temp_directory / f"trellis2_mlx_{run_id}.png"
-        output_path = temp_directory / f"trellis2_mlx_{run_id}.glb"
-        metrics_path = temp_directory / f"trellis2_mlx_{run_id}_metrics.json"
-        _save_input_image(image, mask, input_path)
-
-        environment = build_environment(
-            dict(os.environ),
-            config=mlx_config,
-            image_path=input_path,
-            output_path=output_path,
-            metrics_path=metrics_path,
+        return _run_generation(
+            mlx_config=mlx_config,
+            views=[(0, image, mask)],
             seed=seed,
             steps=steps,
-            use_matting=matting == "on",
+            matting=matting,
         )
 
-        comfy.model_management.unload_all_models()
-        comfy.model_management.soft_empty_cache(force=True)
-        progress = comfy.utils.ProgressBar(100)
 
-        def on_log(line: str) -> None:
-            log.info("[engine] %s", line)
-            if "prepare OK" in line:
-                progress.update_absolute(25)
-            elif "[engine] tier:" in line:
-                progress.update_absolute(30)
-            elif "[engine] run OK" in line:
-                progress.update_absolute(95)
-            elif "[engine] wrote GLB" in line:
-                progress.update_absolute(100)
+class Trellis2MLXMultiViewTo3D(IO.ComfyNode):
+    @classmethod
+    def define_schema(cls):
+        return IO.Schema(
+            node_id="Trellis2MLXMultiViewTo3D",
+            display_name="TRELLIS.2 MLX Multi-View to 3D",
+            category="The Foundry/TRELLIS.2 MLX",
+            description=(
+                "Generate one textured GLB from an ordered model-sheet view set. 000° is required; "
+                "090°, 180°, and 270° are optional and are independently encoded by DINOv3."
+            ),
+            inputs=[
+                IO.Custom("TRELLIS2_MLX_CONFIG").Input("mlx_config"),
+                IO.Image.Input("image_000"),
+                IO.Image.Input("image_090", optional=True),
+                IO.Image.Input("image_180", optional=True),
+                IO.Image.Input("image_270", optional=True),
+                IO.Int.Input("seed", default=0, min=0, max=2**64 - 1),
+                IO.Int.Input("steps", default=12, min=1, max=50),
+                IO.Combo.Input(
+                    "matting",
+                    options=["off", "on"],
+                    default="off",
+                    tooltip="Use 'off' for pre-matted RGBA views. 'on' mattes every raw view.",
+                ),
+                IO.Mask.Input("mask_000", optional=True),
+                IO.Mask.Input("mask_090", optional=True),
+                IO.Mask.Input("mask_180", optional=True),
+                IO.Mask.Input("mask_270", optional=True),
+            ],
+            outputs=[
+                IO.File3DGLB.Output(display_name="model_3d"),
+                IO.String.Output(display_name="artifact_path"),
+                IO.String.Output(display_name="metrics_json"),
+                IO.String.Output(display_name="engine_log"),
+                IO.String.Output(display_name="artifact_sha256"),
+            ],
+        )
 
-        try:
-            metrics, engine_log = run_engine(
-                config=mlx_config,
-                environment=environment,
-                output_path=output_path,
-                metrics_path=metrics_path,
-                on_log=on_log,
-                check_cancelled=comfy.model_management.throw_exception_if_processing_interrupted,
-            )
-        finally:
-            input_path.unlink(missing_ok=True)
-
-        return IO.NodeOutput(
-            Types.File3D(str(output_path), file_format="glb"),
-            str(output_path),
-            json.dumps(metrics, indent=2, sort_keys=True),
-            engine_log,
-            metrics["artifact_sha256"],
+    @classmethod
+    def execute(
+        cls,
+        mlx_config: Trellis2MLXConfig,
+        image_000,
+        seed: int,
+        steps: int,
+        matting: str,
+        image_090=None,
+        image_180=None,
+        image_270=None,
+        mask_000=None,
+        mask_090=None,
+        mask_180=None,
+        mask_270=None,
+    ):
+        candidates = [
+            (0, image_000, mask_000),
+            (90, image_090, mask_090),
+            (180, image_180, mask_180),
+            (270, image_270, mask_270),
+        ]
+        views = [(angle, image, mask) for angle, image, mask in candidates if image is not None]
+        return _run_generation(
+            mlx_config=mlx_config,
+            views=views,
+            seed=seed,
+            steps=steps,
+            matting=matting,
         )
 
 
@@ -243,5 +349,6 @@ class Trellis2MLXMeshReport(IO.ComfyNode):
 __all__ = [
     "Trellis2MLXModel",
     "Trellis2MLXImageTo3D",
+    "Trellis2MLXMultiViewTo3D",
     "Trellis2MLXMeshReport",
 ]

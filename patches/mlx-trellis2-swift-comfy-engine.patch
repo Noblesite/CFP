@@ -2,8 +2,7 @@ diff --git a/Sources/fdgparity/main.swift b/Sources/fdgparity/main.swift
 index 005abfb..d01d29c 100644
 --- a/Sources/fdgparity/main.swift
 +++ b/Sources/fdgparity/main.swift
-@@ -31,3 +31,11 @@ for res in [64, 256] {
-     let order = (0..<n).sorted { a, b in
+@@ -32 +32,9 @@ for res in [64, 256] {
 -        (c[a*3], c[a*3+1], c[a*3+2]) < (c[b*3], c[b*3+1], c[b*3+2])
 +        let aBase = a * 3
 +        let bBase = b * 3
@@ -14,20 +13,44 @@ index 005abfb..d01d29c 100644
 +            return c[aBase + 1] < c[bBase + 1]
 +        }
 +        return c[aBase + 2] < c[bBase + 2]
-     }
 diff --git a/Sources/trellis2-run-engine/main.swift b/Sources/trellis2-run-engine/main.swift
-index 072af6d..3276689 100644
+index 072af6d..d2e946f 100644
 --- a/Sources/trellis2-run-engine/main.swift
 +++ b/Sources/trellis2-run-engine/main.swift
-@@ -22,2 +22,6 @@ import Trellis2Kit
- //   HR_RES       512 (default) / 1024 / 1536
+@@ -19,0 +20,3 @@ import Trellis2Kit
++//   ADDITIONAL_VIEWS_MANIFEST
++//                optional UTF-8 JSON file containing an ordered array of PNG/JPEG paths.
++//                These become ImageTo3DRequest.additionalViews after IMG.
+@@ -22,0 +26,4 @@ import Trellis2Kit
 +//   SEED         deterministic UInt64 base RNG seed (default 0)
 +//   ENGINE_MEMORY_FRACTION
 +//                opt-in unified-memory budget fraction, 0.70 (default) ... 0.98.
 +//                Values above 0.70 reduce OS headroom and may cause swapping or termination.
- 
-@@ -51,2 +55,12 @@ let fmt: Image.Format = imgPath.lowercased().hasSuffix(".jpg") || imgPath.lowerc
- let image = Image(format: fmt, data: pngData)
+@@ -46,2 +53,17 @@ let here = FileManager.default.currentDirectoryPath
+-guard let imgPath = env["IMG"], let pngData = FileManager.default.contents(atPath: imgPath) else {
+-    fatalError("set IMG=<png/jpeg> to a readable input image")
++func loadInputImage(path: String) -> Image {
++    guard let data = FileManager.default.contents(atPath: path) else {
++        fatalError("input image is not readable: \(path)")
++    }
++    let format: Image.Format = path.lowercased().hasSuffix(".jpg")
++        || path.lowercased().hasSuffix(".jpeg") ? .jpeg : .png
++    return Image(format: format, data: data)
++}
++guard let imgPath = env["IMG"] else { fatalError("set IMG=<png/jpeg> to a readable input image") }
++let image = loadInputImage(path: imgPath)
++var additionalViewPaths: [String] = []
++if let manifestPath = env["ADDITIONAL_VIEWS_MANIFEST"] {
++    guard let data = FileManager.default.contents(atPath: manifestPath),
++          let decoded = try? JSONDecoder().decode([String].self, from: data) else {
++        fatalError("ADDITIONAL_VIEWS_MANIFEST must be a readable UTF-8 JSON array of image paths")
++    }
++    additionalViewPaths = decoded
+@@ -48,0 +71 @@ guard let imgPath = env["IMG"], let pngData = FileManager.default.contents(atPat
++let additionalViews = additionalViewPaths.map { loadInputImage(path: $0) }
+@@ -50,2 +73,10 @@ let outGLB = env["OUT_GLB"] ?? "\(here)/out_mesh_engine.glb"
+-let fmt: Image.Format = imgPath.lowercased().hasSuffix(".jpg") || imgPath.lowercased().hasSuffix(".jpeg") ? .jpeg : .png
+-let image = Image(format: fmt, data: pngData)
 +let defaultMemoryFraction = 0.70
 +let memoryFraction: Double
 +if let raw = env["ENGINE_MEMORY_FRACTION"] {
@@ -38,9 +61,12 @@ index 072af6d..3276689 100644
 +} else {
 +    memoryFraction = defaultMemoryFraction
 +}
- 
-@@ -56,3 +70,14 @@ print("[engine] input image: \(imgPath)")
- 
+@@ -55,0 +87,4 @@ print("[engine] input image: \(imgPath)")
++print("[engine] input views: \(1 + additionalViews.count)")
++for (index, path) in additionalViewPaths.enumerated() {
++    print("[engine] additional view \(index + 1): \(path)")
++}
+@@ -57 +92,12 @@ print("[engine] input image: \(imgPath)")
 -let engine = MLXServeEngine()   // .permissiveOnly runs the two-layer license gate at register
 +let device = DeviceProfile.current()
 +let governor = MemoryGovernor.forDevice(device, fraction: memoryFraction)
@@ -54,13 +80,18 @@ index 072af6d..3276689 100644
 +        memoryFraction
 +    ))
 +}
- print("[engine] device budget: \(gb(await engine.memory.budgetBytes)) | available \(gb(await engine.memory.availableBytes))")
-@@ -72,2 +97,4 @@ do {
-     if steps != 12 { print("[engine] sampler steps: \(steps)") }
+@@ -72,0 +119,2 @@ do {
 +    let seed = env["SEED"].flatMap { UInt64($0) } ?? 0
 +    print("[engine] seed: \(seed)")
-     // CFG-cost experiment knobs (shape SLat flows): interval "lo,hi" + vNeg cache stride.
-@@ -107,2 +134,3 @@ do {
-                                               steps: steps,
+@@ -107,0 +156 @@ do {
 +                                              seed: seed,
-                                               unwrapBackend: env["UNWRAP_BACKEND"],
+@@ -131 +180,8 @@ do {
+-    let response = try await engine.run(ImageTo3DRequest(image: image, mode: mode), package: pkgID)
++    let response = try await engine.run(
++        ImageTo3DRequest(
++            image: image,
++            additionalViews: additionalViews.isEmpty ? nil : additionalViews,
++            mode: mode
++        ),
++        package: pkgID
++    )

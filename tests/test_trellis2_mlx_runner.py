@@ -111,6 +111,43 @@ def test_trellis_workflows_include_mesh_report_checkpoint(workflow_name):
     assert report_link[0] in generator["outputs"][0]["links"]
 
 
+def test_multiview_workflow_uses_three_separate_ordered_views():
+    root = Path(__file__).parents[1]
+    workflow_path = (
+        root
+        / "comfyui_trellis2_mlx"
+        / "workflows"
+        / "trellis2_mlx_multiview.json"
+    )
+    workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
+    generator = next(
+        node for node in workflow["nodes"] if node["type"] == "Trellis2MLXMultiViewTo3D"
+    )
+    rmbg_nodes = [node for node in workflow["nodes"] if node["type"] == "RMBG"]
+
+    assert len(rmbg_nodes) == 3
+    assert all(
+        len(node["properties"]["models"]) == 4
+        for node in rmbg_nodes
+    )
+    assert [generator["inputs"][index]["link"] for index in (1, 2, 3, 4)] == [
+        7,
+        8,
+        9,
+        None,
+    ]
+    assert generator["inputs"][1]["name"] == "image_000"
+    assert generator["inputs"][2]["name"] == "image_090"
+    assert generator["inputs"][3]["name"] == "image_180"
+    assert generator["inputs"][4]["name"] == "image_270"
+
+    patch_text = (
+        root / "patches" / "mlx-trellis2-swift-comfy-engine.patch"
+    ).read_text(encoding="utf-8")
+    assert "ADDITIONAL_VIEWS_MANIFEST" in patch_text
+    assert "additionalViews: additionalViews.isEmpty ? nil : additionalViews" in patch_text
+
+
 def test_build_environment_preserves_parent_and_sets_proven_contract(tmp_path):
     config = Trellis2MLXConfig(
         engine_binary=Path("/engine"),
@@ -135,6 +172,31 @@ def test_build_environment_preserves_parent_and_sets_proven_contract(tmp_path):
     assert environment["STEPS"] == "12"
     assert environment["MATTING"] == "off"
     assert environment["ENGINE_MEMORY_FRACTION"] == "0.95"
+    assert "ADDITIONAL_VIEWS_MANIFEST" not in environment
+
+
+def test_build_environment_passes_ordered_additional_views_manifest(tmp_path):
+    config = Trellis2MLXConfig(
+        engine_binary=Path("/engine"),
+        weights_directory=Path("/weights"),
+        memory_fraction=0.95,
+    )
+    manifest = tmp_path / "views.json"
+
+    environment = build_environment(
+        {"ADDITIONAL_VIEWS_MANIFEST": "/stale/views.json"},
+        config=config,
+        image_path=tmp_path / "000.png",
+        output_path=tmp_path / "output.glb",
+        metrics_path=tmp_path / "metrics.json",
+        seed=42,
+        steps=12,
+        use_matting=False,
+        additional_views_manifest=manifest,
+    )
+
+    assert environment["IMG"].endswith("000.png")
+    assert environment["ADDITIONAL_VIEWS_MANIFEST"] == str(manifest)
 
 
 @pytest.mark.parametrize("seed", [-1, 2**64])

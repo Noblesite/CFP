@@ -25,11 +25,11 @@ if [ ! -d "$engine_project/.git" ]; then
     exit 1
 fi
 
-if git -C "$engine_project" apply --reverse --check "$engine_patch" >/dev/null 2>&1; then
+if git -C "$engine_project" apply --unidiff-zero --reverse --check "$engine_patch" >/dev/null 2>&1; then
     echo "CFP engine patch is already applied."
-elif git -C "$engine_project" apply --check "$engine_patch" >/dev/null 2>&1; then
-    echo "Applying CFP Xcode-compatibility, memory-budget, and deterministic-seed patch..."
-    git -C "$engine_project" apply "$engine_patch"
+elif git -C "$engine_project" apply --unidiff-zero --check "$engine_patch" >/dev/null 2>&1; then
+    echo "Applying CFP Xcode, memory-budget, deterministic-seed, and multi-view patch..."
+    git -C "$engine_project" apply --unidiff-zero "$engine_patch"
 else
     echo "The CFP engine patch does not match the mlx-trellis2-swift checkout." >&2
     echo "Expected upstream commit: 005a372" >&2
@@ -81,6 +81,8 @@ cp "$node_source/workflows/trellis2_mlx_image_to_3d.json" \
     "$workflow_dir/CFP_TRELLIS2_MLX_Image_to_3D_v001.json"
 cp "$node_source/workflows/trellis2_mlx_background_clean.json" \
     "$workflow_dir/CFP_TRELLIS2_MLX_Background_Clean_v001.json"
+cp "$node_source/workflows/trellis2_mlx_multiview.json" \
+    "$workflow_dir/CFP_TRELLIS2_MLX_MultiView_v001.json"
 
 echo "TRELLIS.2 MLX node and workflows installed."
 echo "Restart ComfyUI, then open Workflows -> CFP."

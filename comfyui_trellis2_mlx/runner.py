@@ -83,6 +83,7 @@ def build_environment(
     seed: int,
     steps: int,
     use_matting: bool,
+    additional_views_manifest: Path | None = None,
 ) -> dict[str, str]:
     if not 0 <= seed <= (2**64 - 1):
         raise ValueError("seed must be an unsigned 64-bit integer")
@@ -103,6 +104,10 @@ def build_environment(
             "ENGINE_MEMORY_FRACTION": f"{config.memory_fraction:.2f}",
         }
     )
+    if additional_views_manifest is not None:
+        environment["ADDITIONAL_VIEWS_MANIFEST"] = str(additional_views_manifest)
+    else:
+        environment.pop("ADDITIONAL_VIEWS_MANIFEST", None)
     return environment
 
 
