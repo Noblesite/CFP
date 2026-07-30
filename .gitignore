@@ -3,6 +3,11 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .coverage
+.DS_Store
 dist/
 build/
 
+# Local gated model checkout; keep weights and their license-controlled
+# Hugging Face repository out of CFP history.
+trellis2-mlx/
+mlx-trellis2-swift/

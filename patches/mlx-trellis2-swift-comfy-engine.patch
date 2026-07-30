@@ -1,0 +1,66 @@
+diff --git a/Sources/fdgparity/main.swift b/Sources/fdgparity/main.swift
+index 005abfb..d01d29c 100644
+--- a/Sources/fdgparity/main.swift
++++ b/Sources/fdgparity/main.swift
+@@ -31,3 +31,11 @@ for res in [64, 256] {
+     let order = (0..<n).sorted { a, b in
+-        (c[a*3], c[a*3+1], c[a*3+2]) < (c[b*3], c[b*3+1], c[b*3+2])
++        let aBase = a * 3
++        let bBase = b * 3
++        if c[aBase] != c[bBase] {
++            return c[aBase] < c[bBase]
++        }
++        if c[aBase + 1] != c[bBase + 1] {
++            return c[aBase + 1] < c[bBase + 1]
++        }
++        return c[aBase + 2] < c[bBase + 2]
+     }
+diff --git a/Sources/trellis2-run-engine/main.swift b/Sources/trellis2-run-engine/main.swift
+index 072af6d..3276689 100644
+--- a/Sources/trellis2-run-engine/main.swift
++++ b/Sources/trellis2-run-engine/main.swift
+@@ -22,2 +22,6 @@ import Trellis2Kit
+ //   HR_RES       512 (default) / 1024 / 1536
++//   SEED         deterministic UInt64 base RNG seed (default 0)
++//   ENGINE_MEMORY_FRACTION
++//                opt-in unified-memory budget fraction, 0.70 (default) ... 0.98.
++//                Values above 0.70 reduce OS headroom and may cause swapping or termination.
+ 
+@@ -51,2 +55,12 @@ let fmt: Image.Format = imgPath.lowercased().hasSuffix(".jpg") || imgPath.lowerc
+ let image = Image(format: fmt, data: pngData)
++let defaultMemoryFraction = 0.70
++let memoryFraction: Double
++if let raw = env["ENGINE_MEMORY_FRACTION"] {
++    guard let parsed = Double(raw), parsed >= defaultMemoryFraction, parsed <= 0.98 else {
++        fatalError("ENGINE_MEMORY_FRACTION must be between 0.70 and 0.98")
++    }
++    memoryFraction = parsed
++} else {
++    memoryFraction = defaultMemoryFraction
++}
+ 
+@@ -56,3 +70,14 @@ print("[engine] input image: \(imgPath)")
+ 
+-let engine = MLXServeEngine()   // .permissiveOnly runs the two-layer license gate at register
++let device = DeviceProfile.current()
++let governor = MemoryGovernor.forDevice(device, fraction: memoryFraction)
++let engine = MLXServeEngine(
++    device: device,
++    governor: governor
++)   // .permissiveOnly runs the two-layer license gate at register
++if memoryFraction > defaultMemoryFraction {
++    print(String(
++        format: "[engine] WARNING: experimental memory fraction %.2f; OS headroom is reduced",
++        memoryFraction
++    ))
++}
+ print("[engine] device budget: \(gb(await engine.memory.budgetBytes)) | available \(gb(await engine.memory.availableBytes))")
+@@ -72,2 +97,4 @@ do {
+     if steps != 12 { print("[engine] sampler steps: \(steps)") }
++    let seed = env["SEED"].flatMap { UInt64($0) } ?? 0
++    print("[engine] seed: \(seed)")
+     // CFG-cost experiment knobs (shape SLat flows): interval "lo,hi" + vNeg cache stride.
+@@ -107,2 +134,3 @@ do {
+                                               steps: steps,
++                                              seed: seed,
+                                               unwrapBackend: env["UNWRAP_BACKEND"],
