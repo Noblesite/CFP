@@ -1,3 +1,4 @@
+import json
 import os
 import time
 from pathlib import Path
@@ -47,6 +48,30 @@ def test_default_paths_are_relative_to_cfp_checkout():
         "/workspace/CFP/mlx-trellis2-swift/.build/arm64-apple-macosx/release/trellis2-run-engine"
     )
     assert weights == Path("/workspace/CFP/trellis2-mlx")
+
+
+def test_background_workflow_embeds_official_rmbg_model_metadata():
+    workflow_path = (
+        Path(__file__).parents[1]
+        / "comfyui_trellis2_mlx"
+        / "workflows"
+        / "trellis2_mlx_background_clean.json"
+    )
+    workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
+    rmbg_node = next(node for node in workflow["nodes"] if node["type"] == "RMBG")
+    models = rmbg_node["properties"]["models"]
+
+    assert {model["name"] for model in models} == {
+        "BiRefNet_config.py",
+        "birefnet.py",
+        "config.json",
+        "model.safetensors",
+    }
+    assert all(model["directory"] == "RMBG/RMBG-2.0" for model in models)
+    assert all(
+        model["url"].startswith("https://huggingface.co/briaai/RMBG-2.0/resolve/main/")
+        for model in models
+    )
 
 
 def test_build_environment_preserves_parent_and_sets_proven_contract(tmp_path):

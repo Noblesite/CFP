@@ -42,7 +42,29 @@
       "properties": {
         "cnr_id": "comfyui-rmbg",
         "ver": "112fd6141d07663d5e4a35d66d269542b58f4438",
-        "Node name for S&R": "RMBG"
+        "Node name for S&R": "RMBG",
+        "models": [
+          {
+            "name": "BiRefNet_config.py",
+            "url": "https://huggingface.co/briaai/RMBG-2.0/resolve/main/BiRefNet_config.py",
+            "directory": "RMBG/RMBG-2.0"
+          },
+          {
+            "name": "birefnet.py",
+            "url": "https://huggingface.co/briaai/RMBG-2.0/resolve/main/birefnet.py",
+            "directory": "RMBG/RMBG-2.0"
+          },
+          {
+            "name": "config.json",
+            "url": "https://huggingface.co/briaai/RMBG-2.0/resolve/main/config.json",
+            "directory": "RMBG/RMBG-2.0"
+          },
+          {
+            "name": "model.safetensors",
+            "url": "https://huggingface.co/briaai/RMBG-2.0/resolve/main/model.safetensors",
+            "directory": "RMBG/RMBG-2.0"
+          }
+        ]
       },
       "widgets_values": ["RMBG-2.0", 1, 1024, 0, 0, false, false, "Alpha", "#222222"],
       "color": "#222e40",

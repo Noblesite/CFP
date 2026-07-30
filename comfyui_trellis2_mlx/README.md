@@ -62,3 +62,20 @@ The CFP development install also places it under:
 ComfyUI/user/default/workflows/CFP/CFP_TRELLIS2_MLX_Image_to_3D_v001.json
 ComfyUI/user/default/workflows/CFP/CFP_TRELLIS2_MLX_Background_Clean_v001.json
 ```
+
+## RMBG-2.0 model metadata
+
+The background-clean workflow embeds the four required RMBG-2.0 files on its
+`RMBG` node using ComfyUI's `properties.models` metadata. ComfyUI can therefore
+show the dependency in its missing-model/download panel and place it under:
+
+```text
+ComfyUI/models/RMBG/RMBG-2.0/
+```
+
+The links point to the official gated
+[`briaai/RMBG-2.0`](https://huggingface.co/briaai/RMBG-2.0) repository. Accept
+BRIA's access terms and authenticate with Hugging Face before downloading.
+RMBG-2.0 is licensed for non-commercial use under its published terms;
+commercial use requires a separate agreement with BRIA. CFP does not bundle or
+mirror the weights.
