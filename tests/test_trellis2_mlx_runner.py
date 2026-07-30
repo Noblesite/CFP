@@ -73,6 +73,13 @@ def test_background_workflow_embeds_official_rmbg_model_metadata():
         for model in models
     )
 
+    note = next(node for node in workflow["nodes"] if node["type"] == "MarkdownNote")
+    markdown = note["widgets_values"][0]
+    assert "does not turn the backdrop into geometry" in markdown
+    assert "https://huggingface.co/briaai/RMBG-2.0" in markdown
+    assert "ComfyUI/models/RMBG/RMBG-2.0/" in markdown
+    assert "Commercial use requires a separate agreement with BRIA" in markdown
+
 
 def test_build_environment_preserves_parent_and_sets_proven_contract(tmp_path):
     config = Trellis2MLXConfig(
