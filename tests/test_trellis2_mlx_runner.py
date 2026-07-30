@@ -81,6 +81,36 @@ def test_background_workflow_embeds_official_rmbg_model_metadata():
     assert "Commercial use requires a separate agreement with BRIA" in markdown
 
 
+@pytest.mark.parametrize(
+    "workflow_name",
+    [
+        "trellis2_mlx_image_to_3d.json",
+        "trellis2_mlx_background_clean.json",
+    ],
+)
+def test_trellis_workflows_include_mesh_report_checkpoint(workflow_name):
+    workflow_path = (
+        Path(__file__).parents[1]
+        / "comfyui_trellis2_mlx"
+        / "workflows"
+        / workflow_name
+    )
+    workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
+    generator = next(
+        node for node in workflow["nodes"] if node["type"] == "Trellis2MLXImageTo3D"
+    )
+    report_node = next(
+        node for node in workflow["nodes"] if node["type"] == "Trellis2MLXMeshReport"
+    )
+
+    report_link = next(
+        link for link in workflow["links"] if link[3] == report_node["id"]
+    )
+    assert report_link[1:3] == [generator["id"], 0]
+    assert report_link[4:] == [0, "FILE_3D_GLB"]
+    assert report_link[0] in generator["outputs"][0]["links"]
+
+
 def test_build_environment_preserves_parent_and_sets_proven_contract(tmp_path):
     config = Trellis2MLXConfig(
         engine_binary=Path("/engine"),

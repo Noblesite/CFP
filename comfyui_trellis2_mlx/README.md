@@ -36,11 +36,16 @@ TRELLIS.2 MLX Model
         |
         v
 TRELLIS.2 MLX Image to 3D
-        |
         +--> Preview 3D & Animation
-        |
         +--> Save 3D Model
+        +--> TRELLIS.2 MLX Mesh Report
 ```
+
+`TRELLIS.2 MLX Mesh Report` is a read-only post-generation checkpoint. It
+reports vertex and triangle counts, connected components, boundary and
+non-manifold edges, watertightness, bounding-box dimensions, artifact path,
+and SHA-256. Its `PASS`, `REVIEW`, or `FAIL` status is intentionally advisory:
+the GLB is never repaired or modified.
 
 For a standard ComfyUI alpha mask, connect both `IMAGE` and `MASK` and leave
 `matting` set to `off`. The included RMBG workflow instead connects RMBG's

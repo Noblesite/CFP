@@ -14,6 +14,7 @@ import comfy.utils
 import folder_paths
 from comfy_api.latest import IO, Types
 
+from .mesh_report import analyze_glb, format_mesh_report, mesh_report_json
 from .runner import Trellis2MLXConfig, build_environment, default_paths, run_engine
 
 
@@ -205,4 +206,42 @@ class Trellis2MLXImageTo3D(IO.ComfyNode):
         )
 
 
-__all__ = ["Trellis2MLXModel", "Trellis2MLXImageTo3D"]
+class Trellis2MLXMeshReport(IO.ComfyNode):
+    @classmethod
+    def define_schema(cls):
+        return IO.Schema(
+            node_id="Trellis2MLXMeshReport",
+            display_name="TRELLIS.2 MLX Mesh Report",
+            category="The Foundry/TRELLIS.2 MLX",
+            description=(
+                "Inspect a generated GLB without modifying it. Reports topology, dimensions, "
+                "artifact identity, and a human-review status."
+            ),
+            is_output_node=True,
+            inputs=[
+                IO.File3DGLB.Input("model_3d"),
+            ],
+            outputs=[
+                IO.String.Output(display_name="report"),
+                IO.String.Output(display_name="report_json"),
+                IO.String.Output(display_name="status"),
+            ],
+        )
+
+    @classmethod
+    def execute(cls, model_3d: Types.File3D):
+        report = analyze_glb(model_3d.get_source())
+        report_text = format_mesh_report(report)
+        return IO.NodeOutput(
+            report_text,
+            mesh_report_json(report),
+            report["status"],
+            ui={"text": [report_text]},
+        )
+
+
+__all__ = [
+    "Trellis2MLXModel",
+    "Trellis2MLXImageTo3D",
+    "Trellis2MLXMeshReport",
+]

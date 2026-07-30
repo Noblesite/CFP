@@ -1,8 +1,8 @@
 {
   "id": "cfp-trellis2-mlx-image-to-3d-v001",
   "revision": 0,
-  "last_node_id": 5,
-  "last_link_id": 5,
+  "last_node_id": 6,
+  "last_link_id": 6,
   "nodes": [
     {
       "id": 1,
@@ -63,7 +63,7 @@
         {"localized_name": "mask", "name": "mask", "shape": 7, "type": "MASK", "link": 3}
       ],
       "outputs": [
-        {"localized_name": "model_3d", "name": "model_3d", "type": "FILE_3D_GLB", "slot_index": 0, "links": [4, 5]},
+        {"localized_name": "model_3d", "name": "model_3d", "type": "FILE_3D_GLB", "slot_index": 0, "links": [4, 5, 6]},
         {"localized_name": "artifact_path", "name": "artifact_path", "type": "STRING", "slot_index": 1, "links": null},
         {"localized_name": "metrics_json", "name": "metrics_json", "type": "STRING", "slot_index": 2, "links": null},
         {"localized_name": "engine_log", "name": "engine_log", "type": "STRING", "slot_index": 3, "links": null},
@@ -112,6 +112,25 @@
       "outputs": [],
       "properties": {"cnr_id": "comfy-core", "ver": "0.5.1", "Node name for S&R": "SaveGLB"},
       "widgets_values": ["CFP/TRELLIS2_MLX", ""]
+    },
+    {
+      "id": 6,
+      "type": "Trellis2MLXMeshReport",
+      "pos": [1030, 510],
+      "size": [470, 360],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {"localized_name": "model_3d", "name": "model_3d", "type": "FILE_3D_GLB", "link": 6}
+      ],
+      "outputs": [
+        {"localized_name": "report", "name": "report", "type": "STRING", "slot_index": 0, "links": null},
+        {"localized_name": "report_json", "name": "report_json", "type": "STRING", "slot_index": 1, "links": null},
+        {"localized_name": "status", "name": "status", "type": "STRING", "slot_index": 2, "links": null}
+      ],
+      "properties": {"Node name for S&R": "Trellis2MLXMeshReport"},
+      "widgets_values": []
     }
   ],
   "links": [
@@ -119,13 +138,14 @@
     [2, 1, 0, 3, 1, "IMAGE"],
     [3, 1, 1, 3, 5, "MASK"],
     [4, 3, 0, 4, 2, "FILE_3D_GLB"],
-    [5, 3, 0, 5, 0, "FILE_3D_GLB"]
+    [5, 3, 0, 5, 0, "FILE_3D_GLB"],
+    [6, 3, 0, 6, 0, "FILE_3D_GLB"]
   ],
   "groups": [
     {"id": 1, "title": "01 — IMAGE INPUT", "bounding": [-800, 20, 400, 400], "color": "#3f789e", "font_size": 24, "flags": {}},
     {"id": 2, "title": "02 — NATIVE MLX CONFIGURATION", "bounding": [-800, 450, 510, 250], "color": "#8a6f42", "font_size": 24, "flags": {}},
     {"id": 3, "title": "03 — TRELLIS.2 MLX RECONSTRUCTION", "bounding": [-210, 130, 490, 340], "color": "#6b4b8a", "font_size": 24, "flags": {}},
-    {"id": 4, "title": "04 — REVIEW AND SAVE", "bounding": [380, -130, 1120, 720], "color": "#4d8061", "font_size": 24, "flags": {}}
+    {"id": 4, "title": "04 — REVIEW, REPORT, AND SAVE", "bounding": [380, -130, 1160, 1050], "color": "#4d8061", "font_size": 24, "flags": {}}
   ],
   "config": {},
   "extra": {
