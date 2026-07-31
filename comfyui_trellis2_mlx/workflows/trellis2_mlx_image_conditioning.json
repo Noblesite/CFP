@@ -1,0 +1,600 @@
+{
+  "id": "cfp-trellis2-mlx-image-conditioning-v001",
+  "revision": 0,
+  "last_node_id": 7,
+  "last_link_id": 9,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "MarkdownNote",
+      "pos": [
+        -1150,
+        -600
+      ],
+      "size": [
+        650,
+        330
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {},
+      "widgets_values": [
+        "# TRELLIS.2 MLX — IMAGE CONDITIONING ONLY\n\nThis workflow encodes approved, separately aligned object views with DINOv3.\n\n- Camera order is fixed: 000°, 090°, 180°, 270°.\n- Each view remains a separate image and mask.\n- Output is an MLX safetensors conditioning artifact.\n- Sparse structure, shape, texture, and mesh generation do not run here.\n- Automatic promotion is disabled.\n\nUse approved RGBA images or connect the Load Image masks. The next standalone workflow will consume the conditioning artifact."
+      ],
+      "color": "#493b1f",
+      "bgcolor": "#6a5730",
+      "title": "Modular Conditioning Contract"
+    },
+    {
+      "id": 2,
+      "type": "LoadImage",
+      "title": "Load Approved Camera 000°",
+      "pos": [
+        -1050,
+        -180
+      ],
+      "size": [
+        315,
+        314
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "COMBO",
+          "widget": {
+            "name": "image"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "choose file to upload",
+          "name": "upload",
+          "type": "IMAGEUPLOAD",
+          "widget": {
+            "name": "upload"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "slot_index": 0,
+          "links": [
+            2
+          ]
+        },
+        {
+          "localized_name": "MASK",
+          "name": "MASK",
+          "type": "MASK",
+          "slot_index": 1,
+          "links": [
+            3
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.5.1",
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "example.png",
+        "image"
+      ]
+    },
+    {
+      "id": 3,
+      "type": "LoadImage",
+      "title": "Load Approved Camera 090°",
+      "pos": [
+        -1050,
+        120
+      ],
+      "size": [
+        315,
+        314
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "COMBO",
+          "widget": {
+            "name": "image"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "choose file to upload",
+          "name": "upload",
+          "type": "IMAGEUPLOAD",
+          "widget": {
+            "name": "upload"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "slot_index": 0,
+          "links": [
+            4
+          ]
+        },
+        {
+          "localized_name": "MASK",
+          "name": "MASK",
+          "type": "MASK",
+          "slot_index": 1,
+          "links": [
+            5
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.5.1",
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "example.png",
+        "image"
+      ]
+    },
+    {
+      "id": 4,
+      "type": "LoadImage",
+      "title": "Load Approved Camera 180°",
+      "pos": [
+        -1050,
+        420
+      ],
+      "size": [
+        315,
+        314
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "COMBO",
+          "widget": {
+            "name": "image"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "choose file to upload",
+          "name": "upload",
+          "type": "IMAGEUPLOAD",
+          "widget": {
+            "name": "upload"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "slot_index": 0,
+          "links": [
+            6
+          ]
+        },
+        {
+          "localized_name": "MASK",
+          "name": "MASK",
+          "type": "MASK",
+          "slot_index": 1,
+          "links": [
+            7
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.5.1",
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "example.png",
+        "image"
+      ]
+    },
+    {
+      "id": 5,
+      "type": "LoadImage",
+      "title": "Load Approved Camera 270°",
+      "pos": [
+        -1050,
+        720
+      ],
+      "size": [
+        315,
+        314
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "COMBO",
+          "widget": {
+            "name": "image"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "choose file to upload",
+          "name": "upload",
+          "type": "IMAGEUPLOAD",
+          "widget": {
+            "name": "upload"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "slot_index": 0,
+          "links": [
+            8
+          ]
+        },
+        {
+          "localized_name": "MASK",
+          "name": "MASK",
+          "type": "MASK",
+          "slot_index": 1,
+          "links": [
+            9
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.5.1",
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "example.png",
+        "image"
+      ]
+    },
+    {
+      "id": 6,
+      "type": "Trellis2MLXModel",
+      "pos": [
+        -250,
+        650
+      ],
+      "size": [
+        430,
+        150
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "engine_binary",
+          "name": "engine_binary",
+          "type": "STRING",
+          "widget": {
+            "name": "engine_binary"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "weights_directory",
+          "name": "weights_directory",
+          "type": "STRING",
+          "widget": {
+            "name": "weights_directory"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "memory_fraction",
+          "name": "memory_fraction",
+          "type": "FLOAT",
+          "widget": {
+            "name": "memory_fraction"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "mlx_config",
+          "name": "mlx_config",
+          "type": "TRELLIS2_MLX_CONFIG",
+          "links": [
+            1
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "Trellis2MLXModel",
+        "cnr_id": "comfyui-trellis2-mlx",
+        "ver": "0.16.0"
+      },
+      "widgets_values": [
+        "auto",
+        "auto",
+        0.95
+      ]
+    },
+    {
+      "id": 7,
+      "type": "Trellis2MLXImageConditioning",
+      "pos": [
+        250,
+        180
+      ],
+      "size": [
+        500,
+        500
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "mlx_config",
+          "type": "TRELLIS2_MLX_CONFIG",
+          "link": 1
+        },
+        {
+          "name": "image_000",
+          "type": "IMAGE",
+          "link": 2
+        },
+        {
+          "name": "image_090",
+          "type": "IMAGE",
+          "link": 4
+        },
+        {
+          "name": "image_180",
+          "type": "IMAGE",
+          "link": 6
+        },
+        {
+          "name": "image_270",
+          "type": "IMAGE",
+          "link": 8
+        },
+        {
+          "name": "matting",
+          "type": "COMBO",
+          "widget": {
+            "name": "matting"
+          },
+          "link": null
+        },
+        {
+          "name": "mask_000",
+          "type": "MASK",
+          "link": 3
+        },
+        {
+          "name": "mask_090",
+          "type": "MASK",
+          "link": 5
+        },
+        {
+          "name": "mask_180",
+          "type": "MASK",
+          "link": 7
+        },
+        {
+          "name": "mask_270",
+          "type": "MASK",
+          "link": 9
+        }
+      ],
+      "outputs": [
+        {
+          "name": "conditioning",
+          "type": "TRELLIS2_MLX_CONDITIONING",
+          "links": null
+        },
+        {
+          "name": "artifact_path",
+          "type": "STRING",
+          "links": null
+        },
+        {
+          "name": "conditioning_report",
+          "type": "STRING",
+          "links": null
+        },
+        {
+          "name": "conditioning_report_json",
+          "type": "STRING",
+          "links": null
+        },
+        {
+          "name": "engine_log",
+          "type": "STRING",
+          "links": null
+        },
+        {
+          "name": "artifact_sha256",
+          "type": "STRING",
+          "links": null
+        },
+        {
+          "name": "status",
+          "type": "STRING",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "Trellis2MLXImageConditioning",
+        "cnr_id": "comfyui-trellis2-mlx",
+        "ver": "0.16.0"
+      },
+      "widgets_values": [
+        "off"
+      ],
+      "title": "TRELLIS.2 MLX — Encode Approved Model Sheet"
+    }
+  ],
+  "links": [
+    [
+      1,
+      6,
+      0,
+      7,
+      0,
+      "TRELLIS2_MLX_CONFIG"
+    ],
+    [
+      2,
+      2,
+      0,
+      7,
+      1,
+      "IMAGE"
+    ],
+    [
+      3,
+      2,
+      1,
+      7,
+      6,
+      "MASK"
+    ],
+    [
+      4,
+      3,
+      0,
+      7,
+      2,
+      "IMAGE"
+    ],
+    [
+      5,
+      3,
+      1,
+      7,
+      7,
+      "MASK"
+    ],
+    [
+      6,
+      4,
+      0,
+      7,
+      3,
+      "IMAGE"
+    ],
+    [
+      7,
+      4,
+      1,
+      7,
+      8,
+      "MASK"
+    ],
+    [
+      8,
+      5,
+      0,
+      7,
+      4,
+      "IMAGE"
+    ],
+    [
+      9,
+      5,
+      1,
+      7,
+      9,
+      "MASK"
+    ]
+  ],
+  "groups": [
+    {
+      "id": 1,
+      "title": "01 — APPROVED OBJECT MODEL-SHEET INPUTS",
+      "bounding": [
+        -1200,
+        -650,
+        850,
+        1700
+      ],
+      "color": "#3f789e",
+      "font_size": 24,
+      "flags": {}
+    },
+    {
+      "id": 2,
+      "title": "02 — NATIVE MLX CONFIGURATION",
+      "bounding": [
+        -350,
+        600,
+        530,
+        260
+      ],
+      "color": "#a68b32",
+      "font_size": 24,
+      "flags": {}
+    },
+    {
+      "id": 3,
+      "title": "03 — DINOv3 CONDITIONING — NO GENERATION",
+      "bounding": [
+        150,
+        100,
+        700,
+        650
+      ],
+      "color": "#8b5ca6",
+      "font_size": 24,
+      "flags": {}
+    }
+  ],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.65,
+      "offset": [
+        830,
+        390
+      ]
+    },
+    "frontendVersion": "1.30.6",
+    "workflowRendererVersion": "LG"
+  },
+  "version": 0.4
+}

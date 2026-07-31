@@ -59,6 +59,14 @@ class Trellis2MLXConfig:
             raise ValueError("memory_fraction must be between 0.70 and 0.98")
 
 
+@dataclass(frozen=True)
+class Trellis2MLXConditioningArtifact:
+    path: Path
+    view_angles: tuple[int, ...]
+    tier: str
+    artifact_sha256: str
+
+
 def default_paths(node_directory: Path) -> tuple[Path, Path]:
     project_root = node_directory.resolve().parent
     engine = (
@@ -85,6 +93,8 @@ def build_environment(
     use_matting: bool,
     output_mode: str = "textured",
     additional_views_manifest: Path | None = None,
+    engine_stage: str = "full",
+    view_angles: tuple[int, ...] | None = None,
 ) -> dict[str, str]:
     if not 0 <= seed <= (2**64 - 1):
         raise ValueError("seed must be an unsigned 64-bit integer")
@@ -92,6 +102,10 @@ def build_environment(
         raise ValueError("steps must be between 1 and 50")
     if output_mode not in {"textured", "geometry_only"}:
         raise ValueError("output_mode must be 'textured' or 'geometry_only'")
+    if engine_stage not in {"full", "conditioning"}:
+        raise ValueError("engine_stage must be 'full' or 'conditioning'")
+    if view_angles is not None and not view_angles:
+        raise ValueError("view_angles must contain at least one camera angle")
 
     environment = dict(base_environment)
     environment.update(
@@ -99,6 +113,7 @@ def build_environment(
             "IMG": str(image_path),
             "WEIGHTS_DIR": str(config.weights_directory),
             "OUT_GLB": str(output_path),
+            "OUT_CONDITIONING": str(output_path),
             "METRICS_JSON": str(metrics_path),
             "HR_RES": "512",
             "STEPS": str(steps),
@@ -106,8 +121,13 @@ def build_environment(
             "MATTING": "on" if use_matting else "off",
             "TEXTURE": "off" if output_mode == "geometry_only" else "on",
             "ENGINE_MEMORY_FRACTION": f"{config.memory_fraction:.2f}",
+            "ENGINE_STAGE": engine_stage,
         }
     )
+    if view_angles is not None:
+        environment["VIEW_ANGLES"] = ",".join(str(angle) for angle in view_angles)
+    else:
+        environment.pop("VIEW_ANGLES", None)
     if additional_views_manifest is not None:
         environment["ADDITIONAL_VIEWS_MANIFEST"] = str(additional_views_manifest)
     else:
@@ -123,6 +143,7 @@ def run_engine(
     metrics_path: Path,
     on_log: LogCallback,
     check_cancelled: CancelCallback,
+    artifact_kind: str = "glb",
 ) -> tuple[dict, str]:
     config.validate()
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -171,15 +192,31 @@ def run_engine(
     if process.returncode != 0:
         tail = "\n".join(lines[-40:])
         raise RuntimeError(f"TRELLIS.2 MLX engine exited with code {process.returncode}.\n{tail}")
+    if artifact_kind not in {"glb", "safetensors"}:
+        raise ValueError("artifact_kind must be 'glb' or 'safetensors'")
     if not output_path.is_file() or output_path.stat().st_size < 12:
-        raise RuntimeError("TRELLIS.2 MLX completed without producing a GLB artifact.")
-    if output_path.read_bytes()[:4] != b"glTF":
+        raise RuntimeError(f"TRELLIS.2 MLX completed without producing a {artifact_kind} artifact.")
+    artifact_bytes = output_path.read_bytes()
+    if artifact_kind == "glb" and artifact_bytes[:4] != b"glTF":
         raise RuntimeError(f"TRELLIS.2 MLX produced an invalid GLB artifact: {output_path}")
+    if artifact_kind == "safetensors":
+        header_size = int.from_bytes(artifact_bytes[:8], byteorder="little", signed=False)
+        if header_size <= 2 or header_size > len(artifact_bytes) - 8:
+            raise RuntimeError(f"TRELLIS.2 MLX produced an invalid safetensors artifact: {output_path}")
+        try:
+            header = json.loads(artifact_bytes[8 : 8 + header_size].decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as error:
+            raise RuntimeError(
+                f"TRELLIS.2 MLX produced an unreadable safetensors header: {output_path}"
+            ) from error
+        if "cond_512" not in header or "neg_cond_512" not in header:
+            raise RuntimeError("Conditioning artifact is missing cond_512 or neg_cond_512 tensors")
 
     metrics = {}
     if metrics_path.is_file():
         metrics = json.loads(metrics_path.read_text(encoding="utf-8"))
     metrics["wrapper_completed_at"] = time.time()
+    metrics["artifact_kind"] = artifact_kind
     metrics["artifact_bytes"] = output_path.stat().st_size
-    metrics["artifact_sha256"] = hashlib.sha256(output_path.read_bytes()).hexdigest()
+    metrics["artifact_sha256"] = hashlib.sha256(artifact_bytes).hexdigest()
     return metrics, log_text

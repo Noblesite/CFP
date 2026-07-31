@@ -72,6 +72,12 @@ The model-sheet workbench applies that gate independently to the populated
 separate through TRELLIS conditioning, and any rejected view stops the shared
 native inference run.
 
+The first modular generation-stage workflow ends after native DINOv3 image
+conditioning. It writes a reusable MLX safetensors artifact containing the
+ordered 512-resolution positive and negative conditioning tensors; it does not
+run sparse, shape, texture, or mesh generation. This establishes the typed
+handoff required by the future standalone sparse-generation workflow.
+
 The four-view workbench extends that baseline with the complete 270° right-side
 camera branch. This keeps the three-view workflow available for comparison
 while providing a fixed 000°, 090°, 180°, 270° cardinal model sheet.

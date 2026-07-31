@@ -83,6 +83,8 @@ cp "$node_source/workflows/trellis2_mlx_background_clean.json" \
     "$workflow_dir/CFP_TRELLIS2_MLX_Background_Clean_v001.json"
 cp "$node_source/workflows/trellis2_mlx_multiview.json" \
     "$workflow_dir/CFP_TRELLIS2_MLX_MultiView_v001.json"
+cp "$node_source/workflows/trellis2_mlx_image_conditioning.json" \
+    "$workflow_dir/CFP_TRELLIS2_MLX_Image_Conditioning_v001.json"
 cp "$node_source/workflows/trellis2_mlx_geometry_only.json" \
     "$workflow_dir/CFP_TRELLIS2_MLX_Geometry_Only_v001.json"
 cp "$node_source/workflows/trellis2_mlx_remove_floaters.json" \

@@ -45,7 +45,13 @@ from .background_geometry_guard import (
     inspect_background_geometry,
 )
 from .mesh_report import analyze_glb, format_mesh_report, mesh_report_json
-from .runner import Trellis2MLXConfig, build_environment, default_paths, run_engine
+from .runner import (
+    Trellis2MLXConditioningArtifact,
+    Trellis2MLXConfig,
+    build_environment,
+    default_paths,
+    run_engine,
+)
 from .topology_diagnostics import (
     diagnose_ovoxel_topology,
     format_topology_diagnostics,
@@ -581,6 +587,106 @@ def _run_generation(
     )
 
 
+def _run_conditioning(
+    *,
+    mlx_config: Trellis2MLXConfig,
+    views: list[tuple[int, object, object | None]],
+    matting: str,
+):
+    temp_directory = Path(folder_paths.get_temp_directory())
+    temp_directory.mkdir(parents=True, exist_ok=True)
+    run_id = uuid.uuid4().hex
+    output_path = temp_directory / f"trellis2_mlx_conditioning_{run_id}.safetensors"
+    metrics_path = temp_directory / f"trellis2_mlx_conditioning_{run_id}_report.json"
+    manifest_path = temp_directory / f"trellis2_mlx_conditioning_{run_id}_views.json"
+    input_paths: list[Path] = []
+
+    try:
+        for angle, image, mask in views:
+            input_path = temp_directory / f"trellis2_mlx_conditioning_{run_id}_{angle:03d}.png"
+            _save_input_image(image, mask, input_path)
+            input_paths.append(input_path)
+
+        additional_manifest = None
+        if len(input_paths) > 1:
+            manifest_path.write_text(
+                json.dumps([str(path) for path in input_paths[1:]]),
+                encoding="utf-8",
+            )
+            additional_manifest = manifest_path
+
+        view_angles = tuple(angle for angle, _, _ in views)
+        environment = build_environment(
+            dict(os.environ),
+            config=mlx_config,
+            image_path=input_paths[0],
+            output_path=output_path,
+            metrics_path=metrics_path,
+            seed=0,
+            steps=12,
+            use_matting=matting == "on",
+            output_mode="geometry_only",
+            additional_views_manifest=additional_manifest,
+            engine_stage="conditioning",
+            view_angles=view_angles,
+        )
+
+        comfy.model_management.unload_all_models()
+        comfy.model_management.soft_empty_cache(force=True)
+        progress = comfy.utils.ProgressBar(100)
+
+        def on_log(line: str) -> None:
+            log.info("[conditioning-engine] %s", line)
+            if "prepare OK" in line:
+                progress.update_absolute(40)
+            elif "conditioning OK" in line:
+                progress.update_absolute(95)
+            elif "wrote conditioning" in line:
+                progress.update_absolute(100)
+
+        metrics, engine_log = run_engine(
+            config=mlx_config,
+            environment=environment,
+            output_path=output_path,
+            metrics_path=metrics_path,
+            on_log=on_log,
+            check_cancelled=comfy.model_management.throw_exception_if_processing_interrupted,
+            artifact_kind="safetensors",
+        )
+        metrics["input_view_angles"] = list(view_angles)
+        metrics["automatic_promotion"] = False
+    finally:
+        for input_path in input_paths:
+            input_path.unlink(missing_ok=True)
+        manifest_path.unlink(missing_ok=True)
+
+    report_json = json.dumps(metrics, indent=2, sort_keys=True)
+    report_text = (
+        "TRELLIS.2 MLX Conditioning\n"
+        f"Status: {metrics.get('status', 'CONDITIONING_READY')}\n"
+        f"Views: {', '.join(f'{angle:03d}°' for angle in view_angles)}\n"
+        f"cond_512: {metrics.get('cond_512_shape', 'unknown')}\n"
+        f"Artifact: {output_path}\n"
+        "Automatic promotion: No"
+    )
+    artifact = Trellis2MLXConditioningArtifact(
+        path=output_path,
+        view_angles=view_angles,
+        tier="res512",
+        artifact_sha256=metrics["artifact_sha256"],
+    )
+    return IO.NodeOutput(
+        artifact,
+        str(output_path),
+        report_text,
+        report_json,
+        engine_log,
+        metrics["artifact_sha256"],
+        metrics.get("status", "CONDITIONING_READY"),
+        ui={"text": [report_text]},
+    )
+
+
 class Trellis2MLXModel(IO.ComfyNode):
     @classmethod
     def define_schema(cls):
@@ -632,6 +738,70 @@ class Trellis2MLXModel(IO.ComfyNode):
         )
         config.validate()
         return IO.NodeOutput(config)
+
+
+class Trellis2MLXImageConditioning(IO.ComfyNode):
+    @classmethod
+    def define_schema(cls):
+        return IO.Schema(
+            node_id="Trellis2MLXImageConditioning",
+            display_name="TRELLIS.2 MLX Image Conditioning",
+            category="The Foundry/TRELLIS.2 MLX/Stages",
+            description=(
+                "Encode one or more ordered object views with DINOv3 and stop before sparse "
+                "structure generation. Produces a reusable MLX safetensors artifact."
+            ),
+            is_output_node=True,
+            inputs=[
+                IO.Custom("TRELLIS2_MLX_CONFIG").Input("mlx_config"),
+                IO.Image.Input("image_000"),
+                IO.Image.Input("image_090", optional=True),
+                IO.Image.Input("image_180", optional=True),
+                IO.Image.Input("image_270", optional=True),
+                IO.Combo.Input(
+                    "matting",
+                    options=["off", "on"],
+                    default="off",
+                    tooltip="Use off for approved RGBA views or connected masks.",
+                ),
+                IO.Mask.Input("mask_000", optional=True),
+                IO.Mask.Input("mask_090", optional=True),
+                IO.Mask.Input("mask_180", optional=True),
+                IO.Mask.Input("mask_270", optional=True),
+            ],
+            outputs=[
+                IO.Custom("TRELLIS2_MLX_CONDITIONING").Output(display_name="conditioning"),
+                IO.String.Output(display_name="artifact_path"),
+                IO.String.Output(display_name="conditioning_report"),
+                IO.String.Output(display_name="conditioning_report_json"),
+                IO.String.Output(display_name="engine_log"),
+                IO.String.Output(display_name="artifact_sha256"),
+                IO.String.Output(display_name="status"),
+            ],
+        )
+
+    @classmethod
+    def execute(
+        cls,
+        mlx_config: Trellis2MLXConfig,
+        image_000,
+        matting: str,
+        image_090=None,
+        image_180=None,
+        image_270=None,
+        mask_000=None,
+        mask_090=None,
+        mask_180=None,
+        mask_270=None,
+    ):
+        candidates = [
+            (0, image_000, mask_000),
+            (90, image_090, mask_090),
+            (180, image_180, mask_180),
+            (270, image_270, mask_270),
+        ]
+        views = [(angle, image, mask) for angle, image, mask in candidates if image is not None]
+        return _run_conditioning(mlx_config=mlx_config, views=views, matting=matting)
 
 
 class Trellis2MLXImageTo3D(IO.ComfyNode):

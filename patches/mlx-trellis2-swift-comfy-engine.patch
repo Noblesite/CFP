@@ -2,7 +2,10 @@ diff --git a/Sources/TRELLIS2/MeshBake.swift b/Sources/TRELLIS2/MeshBake.swift
 index 807bba0..5af2556 100644
 --- a/Sources/TRELLIS2/MeshBake.swift
 +++ b/Sources/TRELLIS2/MeshBake.swift
-@@ -25,0 +26,10 @@ public struct BakedMesh {
+@@ -23,6 +23,16 @@ public struct BakedMesh {
+     public let wallFlipped: [Bool]
+ }
+
 +/// Geometry-only result from the shared dual-grid extraction and cleanup tail.
 +///
 +/// This intentionally carries no UVs, texture atlas, material channels, or bake diagnostics.
@@ -13,7 +16,13 @@ index 807bba0..5af2556 100644
 +    public let normals: MLXArray    // [V,3]
 +}
 +
-@@ -39,0 +50,66 @@ public enum MeshBake {
+ /// Which unwrap produces the bake's UV atlas (UV-UNWRAP-METAL-PLAN.md).
+ /// `.xatlas`: remesh → simplify → xatlas chart computation (CPU, minutes on
+ /// production meshes). `.provenance`: tagged remesh → grid-provenance charts →
+@@ -37,6 +47,72 @@ public enum MeshBake {
+         MLX.maximum(x, 0) + MLX.log(1 + MLX.exp(-MLX.abs(x)))
+     }
+
 +    /// Extract and clean geometry without entering the UV/texture bake pipeline.
 +    ///
 +    /// The dual-grid surface, DC remesh, optional simplification, winding normalization, and
@@ -80,11 +89,17 @@ index 807bba0..5af2556 100644
 +        )
 +    }
 +
+     /// shapeFeats [N,7] (raw shape-decoder out), coords [N,4] (b,x,y,z),
+     /// texBaseColor [N,3] in [0,1] (tex-decoder basecolor at the same coords),
+     /// fineRes = the dual-grid voxel resolution the coords live in.
 diff --git a/Sources/TRELLIS2/Trellis2Pipeline.swift b/Sources/TRELLIS2/Trellis2Pipeline.swift
 index fdc4283..df8da59 100644
 --- a/Sources/TRELLIS2/Trellis2Pipeline.swift
 +++ b/Sources/TRELLIS2/Trellis2Pipeline.swift
-@@ -5,0 +6,89 @@ import MLXRandom
+@@ -3,6 +3,95 @@ import Metal
+ import MLX
+ import MLXRandom
+
 +/// Mesh result shared by the textured and manufacturing-focused geometry lanes.
 +///
 +/// Geometry-only generation deliberately leaves every texture-related field nil so callers can
@@ -174,18 +189,32 @@ index fdc4283..df8da59 100644
 +    }
 +}
 +
-@@ -117,2 +206,2 @@ public final class Trellis2Pipeline {
+ /// End-to-end TRELLIS.2 generation, all native Swift-MLX: image conditioning →
+ /// sparse structure → shape SLat → shape mesh + tex SLat → PBR → textured GLB.
+ /// Every stage is a parity-gated component; this chains them.
+@@ -114,12 +203,12 @@ public final class Trellis2Pipeline {
+     /// `shapeMean/Std`, `texMean/Std` = the pipeline's per-channel SLat normalization [32].
+     /// The sampler emits a NORMALIZED latent (std≈1); the decoder needs it DENORMALIZED
+     /// (× std + mean). The tex concat_cond, by contrast, wants the raw normalized shape slat.
 -    /// `texture` false → geometry-only fast path (skip the tex flow + decoder; flat-gray mesh,
 -    /// ~2× faster). `targetFaces` → decimation target for MeshBake. `yUp` → emit Y-up
 +    /// `texture` false → geometry-only fast path (skip the tex flow, decoder, UV unwrap,
 +    /// rasterization, and atlas bake). `targetFaces` → decimation target. `yUp` → emit Y-up
-@@ -122 +211 @@ public final class Trellis2Pipeline {
+     /// (x,y,z)→(x,z,−y), the glTF/VRM convention required BEFORE rigging (a post-rig
+     /// reorientation mis-composes with clip playback).
+     /// `remeshRes` nil → per-tier default (256; 384 at res1536).
 -    /// Returns the baked mesh and the EFFECTIVE hr resolution (== tier target unless the
 +    /// Returns the generated mesh and the EFFECTIVE hr resolution (== tier target unless the
-@@ -136 +225 @@ public final class Trellis2Pipeline {
+     /// cascade token back-off reduced it).
+     public func generate(tier: Trellis2Tier = .res1024,
+                          cond: MLXArray, negCond: MLXArray,
+@@ -133,16 +222,22 @@ public final class Trellis2Pipeline {
+                          slatNegEvery: Int = 1,                    // CFG cache: 1 = off (upstream)
+                          maxHRTokens: Int? = nil,                  // nil = budget-derived (see [2b])
+                          remeshRes: Int? = nil, seed: UInt64 = 0,
 -                         log: (String) -> Void = { print($0) }) throws -> (mesh: BakedMesh, hrResolution: Int, metrics: Trellis2StageMetrics) {
 +                         log: (String) -> Void = { print($0) }) throws -> (mesh: GeneratedMesh, hrResolution: Int, metrics: Trellis2StageMetrics) {
-@@ -138 +227,7 @@ public final class Trellis2Pipeline {
+         // Bound flow residency to this tier's working set.
 -        releaseFlows(keeping: tier.isCascade ? [.shape512, .shape1024, .tex1024] : [.shape512, .tex512])
 +        let requiredFlows: Set<FlowKind>
 +        if tier.isCascade {
@@ -194,31 +223,53 @@ index fdc4283..df8da59 100644
 +            requiredFlows = texture ? [.shape512, .tex512] : [.shape512]
 +        }
 +        releaseFlows(keeping: requiredFlows)
-@@ -145 +240 @@ public final class Trellis2Pipeline {
+
+         // Per-stage timing (BENCHMARKS.md full-workflow harness). Each `-t.timeIntervalSinceNow`
+         // read below follows the stage's MLX.eval barrier, so deltas are real wall-clock.
+         var metrics = Trellis2StageMetrics()
+         metrics.tier = tier.rawValue
+         metrics.seed = seed
 -        metrics.backend = unwrapBackend.rawValue
 +        metrics.backend = texture ? unwrapBackend.rawValue : "none"
-@@ -261 +356 @@ public final class Trellis2Pipeline {
+
+         // High-guidance CFG (SS r0.7, shape r0.5) is fp-sensitive — the g·vPos−(g−1)·vNeg
+         // near-cancellation amplifies per-forward noise, so bf16-SDPA noise there shows up
+@@ -258,10 +353,10 @@ public final class Trellis2Pipeline {
+         log("  [3] shape decoded: \(shapeOut.count) voxels (\(String(format: "%.1f", metrics.shapeDecodeS))s)")
+
+         // 4-5) texture: tex SLat sampler (concat_cond=shape_slat, no CFG) → tex decode → base
 -        //      color. `texture=false` skips both stages for a flat-gray geometry-only mesh.
 +        //      color. `texture=false` skips both stages and does not synthesize an atlas source.
-@@ -264 +359 @@ public final class Trellis2Pipeline {
+         //      Cascade mirrors upstream: tex 1024 flow, HR shape slat concat, same HR coords,
+         //      cond_1024; res512 keeps the 512 flow + cond_512.
 -        let baseColor: MLXArray
 +        var baseColor: MLXArray?
-@@ -278,2 +373,3 @@ public final class Trellis2Pipeline {
+         if texture {
+             t = Date(); MLXRandom.seed(seed &+ 1)
+             let texSlat = FlowEulerSampler.sampleSLat(
+@@ -275,40 +370,61 @@ public final class Trellis2Pipeline {
+             t = Date()
+             let texSlatDenorm = texSlat * texStd + texMean
+             let texOut = texDec(SparseTensor(feats: texSlatDenorm, coords: hrCoords), guidedMasks: subs)
 -            baseColor = MLX.clip(texOut.feats[0..., 0..<3] * 0.5 + 0.5, min: 0, max: 1)
 -            MLX.eval(baseColor)
 +            let decodedColor = MLX.clip(texOut.feats[0..., 0..<3] * 0.5 + 0.5, min: 0, max: 1)
 +            MLX.eval(decodedColor)
 +            baseColor = decodedColor
-@@ -283,2 +379,2 @@ public final class Trellis2Pipeline {
+             metrics.texDecodeS = -t.timeIntervalSinceNow
+             log("  [5] tex decoded: \(texOut.count) voxels (\(String(format: "%.1f", metrics.texDecodeS ?? 0))s)")
+         } else {
 -            baseColor = MLXArray.zeros([shapeOut.count, 3]) + 0.5   // flat gray, geometry-only
 -            log("  [4-5] texture off — geometry-only (flat gray)")
 +            baseColor = nil
 +            log("  [4-5] texture off — skipping texture flow and decoder")
-@@ -287 +383,2 @@ public final class Trellis2Pipeline {
+         }
+
 -        // 6) mesh + texture bake → clean mesh, at the tier's (possibly backed-off) resolution.
 +        // 6) Finalize the mesh at the tier's (possibly backed-off) resolution. Textured mode
 +        //    enters the full UV/atlas bake; geometry-only mode stops after mesh cleanup + normals.
-@@ -290,4 +387,29 @@ public final class Trellis2Pipeline {
+         t = Date()
+         let remesh = remeshRes ?? (hrResolution >= 1536 ? 384 : 256)
 -        let (bakedInit, bakeMetrics) = try MeshBake.run(shapeFeats: shapeOut.feats, coords: shapeOut.coords, texBaseColor: baseColor,
 -                                     fineRes: Float(hrResolution), remeshRes: remesh,
 -                                     targetFaces: targetFaces, atlasSize: 1024,
@@ -252,10 +303,14 @@ index fdc4283..df8da59 100644
 +            bakeMetrics = measured
 +            log("  [6] geometry finalized without UV unwrap, rasterization, or atlas bake")
 +        }
-@@ -296 +418 @@ public final class Trellis2Pipeline {
+         metrics.meshbakeS = -t.timeIntervalSinceNow
+         metrics.bake = bakeMetrics
 -        var baked = bakedInit
 +        var generated = generatedInit
-@@ -301,7 +423 @@ public final class Trellis2Pipeline {
+
+         // 7) optional Y-up reorientation (x,y,z)→(x,z,−y): a proper rotation, winding preserved.
+         t = Date()
+         if yUp {
 -            func toYUp(_ a: MLXArray) -> MLXArray {
 -                MLX.stacked([a[0..., 0], a[0..., 2], -a[0..., 1]], axis: 1)
 -            }
@@ -264,39 +319,125 @@ index fdc4283..df8da59 100644
 -                              mrRGBA: baked.mrRGBA,
 -                              filledBeforeInpaint: baked.filledBeforeInpaint, wallFlipped: baked.wallFlipped)
 +            generated = generated.reorientedYUp()
-@@ -312 +428 @@ public final class Trellis2Pipeline {
+             log("  [7] reoriented Y-up")
+         }
+         metrics.yupS = -t.timeIntervalSinceNow
+         metrics.hrResolution = hrResolution
 -        return (baked, hrResolution, metrics)
 +        return (generated, hrResolution, metrics)
+     }
+ }
 diff --git a/Sources/Trellis2Kit/Trellis2Package.swift b/Sources/Trellis2Kit/Trellis2Package.swift
-index 0e8c55e..0642621 100644
+index 0e8c55e..a98209b 100644
 --- a/Sources/Trellis2Kit/Trellis2Package.swift
 +++ b/Sources/Trellis2Kit/Trellis2Package.swift
-@@ -33 +33 @@ public struct Trellis2Configuration: PackageConfiguration, ModelStorable, QuantC
+@@ -30,7 +30,7 @@ public struct Trellis2Configuration: PackageConfiguration, ModelStorable, QuantC
+     public var seed: UInt64
+
+     /// Run the texture path (tex SLat flow + tex decoder → base-color UV texture). Default on;
 -    /// false = geometry-only flat-gray mesh (skips a 2nd flow + 2nd decode, ~2× faster).
 +    /// false = geometry-only mesh (skips texture flow/decode and the UV/atlas bake).
-@@ -444 +444 @@ public final class Trellis2Package: ModelPackage {
+     public var texture: Bool
+
+     /// Decimate the extracted mesh to this face target before GLB encode (matches the HF `to_glb`
+@@ -269,6 +269,38 @@ public enum Trellis2Error: Error, Sendable {
+
+ // MARK: - ModelPackage conformer
+
++/// CFP's first modular TRELLIS.2 stage contract. It intentionally uses the existing
++/// imageTo3D capability for engine admission while returning only DINOv3 conditioning tensors.
++/// No sparse structure, shape latent, texture latent, mesh, or GLB is generated.
++public struct Trellis2ConditioningRequest: CapabilityRequest {
++    public static var capability: Capability { .imageTo3D }
++
++    public let image: Image
++    public let additionalViews: [Image]?
++    public let viewAngles: [Int]
++    public let mode: Mode?
++    public let metaData: MetaData
++
++    public init(image: Image, additionalViews: [Image]? = nil, viewAngles: [Int],
++                mode: Mode? = nil, metaData: MetaData = [:]) {
++        self.image = image
++        self.additionalViews = additionalViews
++        self.viewAngles = viewAngles
++        self.mode = mode
++        self.metaData = metaData
++    }
++}
++
++public struct Trellis2ConditioningResponse: CapabilityResponse {
++    public let artifact: Data
++    public let reportJSON: Data
++
++    public init(artifact: Data, reportJSON: Data) {
++        self.artifact = artifact
++        self.reportJSON = reportJSON
++    }
++}
++
+ /// MLXToolKit `ModelPackage` conformer for TRELLIS.2 image→3D (UV-textured GLB output).
+ ///
+ /// C7 weight license: the DINOv3 conditioner license is non-SPDX but functionally permissive and
+@@ -374,11 +406,18 @@ public final class Trellis2Package: ModelPackage {
+         // CAN gate: the entry checkpoint is the FIRST act of run() — before capability validation and
+         // the notLoaded guard — so a pre-cancelled run refuses before weights.
+         try Task.checkCancellation()
+-        guard request.capability == .imageTo3D, let req = request as? ImageTo3DRequest else {
++        guard request.capability == .imageTo3D else {
+             throw PackageError.unsupportedCapability(request.capability)
+         }
+         guard let pipeline else { throw PackageError.notLoaded }
+
++        if let conditioningRequest = request as? Trellis2ConditioningRequest {
++            return try await runConditioning(conditioningRequest, pipeline: pipeline)
++        }
++        guard let req = request as? ImageTo3DRequest else {
++            throw PackageError.unsupportedCapability(request.capability)
++        }
++
+         // Resolution tier (voxel grid): res512 = direct 512 flows; res1024/res1536 = the T0.3
+         // cascade (LR 512 pass → decoder-upsample re-quantization → HR 1024 flows, token
+         // back-off floor 1024).
+@@ -441,7 +480,7 @@ public final class Trellis2Package: ModelPackage {
+
+         // The pipeline's samplers/decoders honor cooperative cancellation at their step/layer seams
+         // (they read the ambient Task); generate() is the long-running body.
 -        let (baked, _, stageMetrics) = try pipeline.generate(
 +        let (generated, _, stageMetrics) = try pipeline.generate(
-@@ -465,0 +466,6 @@ public final class Trellis2Package: ModelPackage {
+             tier: tier,
+             cond: cond, negCond: negCond, cond1024: cond1024, negCond1024: negCond1024,
+             ssNoise: ssNoise, ssPhases: ssPhases,
+@@ -463,14 +502,20 @@ public final class Trellis2Package: ModelPackage {
+         try Task.checkCancellation()
+
+         let tGlb = Date()
 +        let baseColorRGBA: (pixels: [UInt8], width: Int, height: Int)? =
 +            if let rgba = generated.texRGBA, let size = generated.atlasSize {
 +                (rgba, size, size)
 +            } else {
 +                nil
 +            }
-@@ -467,3 +473,3 @@ public final class Trellis2Package: ModelPackage {
+         let glb = try GLTFExport.glbData(
 -            positions: baked.vertices, indices: baked.faces,
 -            normals: baked.normals, uvs: baked.uvs,
 -            baseColorRGBA: (baked.texRGBA, baked.atlasSize, baked.atlasSize))
 +            positions: generated.vertices, indices: generated.faces,
 +            normals: generated.normals, uvs: generated.uvs,
 +            baseColorRGBA: baseColorRGBA)
-@@ -472,2 +478,2 @@ public final class Trellis2Package: ModelPackage {
+         let glbExportS = -tGlb.timeIntervalSinceNow
+         let mesh = Mesh(format: .glb, data: glb,
 -                        vertexCount: baked.vertices.dim(0), faceCount: baked.faces.dim(0),
 -                        hasVertexColors: false)   // UV-textured, not vertex colors
 +                        vertexCount: generated.vertices.dim(0), faceCount: generated.faces.dim(0),
 +                        hasVertexColors: false)
-@@ -486,3 +492,7 @@ public final class Trellis2Package: ModelPackage {
+
+         // Full-workflow profile record (opt-in): generate()-scope stage timers + the DINO/GLB
+         // bookends this method owns. One flat JSON line (sortedKeys) — unwrapbench/bakeab convention.
+@@ -483,9 +528,13 @@ public final class Trellis2Package: ModelPackage {
+             rec["dino_encode_1024_s"] = dinoEncode1024S
+             rec["glb_export_s"] = glbExportS
+             rec["views"] = views.count
 -            rec["mesh_verts"] = baked.vertices.dim(0)
 -            rec["mesh_faces"] = baked.faces.dim(0)
 -            rec["atlas_size"] = baked.atlasSize
@@ -307,11 +448,89 @@ index 0e8c55e..0642621 100644
 +            rec["atlas_size"] = generated.atlasSize ?? 0
 +            rec["uv_enabled"] = generated.uvs != nil
 +            rec["texture_embedded"] = generated.texRGBA != nil
+             rec["glb_bytes"] = glb.count
+             rec["gpu_peak_bytes"] = Int(GPU.peakMemory)
+             // SDPA kernel lane (M5/NAX): MLX_ENABLE_TF32 defaults ON, so "fp32" SDPA runs
+@@ -503,6 +552,71 @@ public final class Trellis2Package: ModelPackage {
+         return ImageTo3DResponse(mesh: mesh)
+     }
+
++    private func runConditioning(
++        _ request: Trellis2ConditioningRequest,
++        pipeline: Trellis2Pipeline
++    ) async throws -> Trellis2ConditioningResponse {
++        var views = [request.image] + (request.additionalViews ?? [])
++        guard request.viewAngles.count == views.count else {
++            throw PackageError.unsupportedRequestFeature(
++                "conditioning viewAngles count must match the number of images"
++            )
++        }
++
++        let mode = request.mode ?? configuration.defaultMode
++        let cascade = mode == ImageTo3DContract.res1024 || mode == ImageTo3DContract.res1536
++        let started = Date()
++        if let matting = configuration.matting {
++            for index in views.indices {
++                views[index] = try await ImagePreprocess.mattedIfNeeded(views[index], using: matting)
++                try Task.checkCancellation()
++            }
++        }
++
++        let px512 = try views.map { try ImagePreprocess.dinoPixels(from: $0, size: 512) }
++        let (cond512, negCond512) = pipeline.encodeImages(px512)
++        MLX.eval(cond512, negCond512)
++
++        var arrays: [String: MLXArray] = [
++            "cond_512": cond512,
++            "neg_cond_512": negCond512,
++        ]
++        var shape1024: [Int]? = nil
++        if cascade {
++            let px1024 = try views.map { try ImagePreprocess.dinoPixels(from: $0, size: 1024) }
++            let (cond1024, negCond1024) = pipeline.encodeImages(px1024)
++            MLX.eval(cond1024, negCond1024)
++            arrays["cond_1024"] = cond1024
++            arrays["neg_cond_1024"] = negCond1024
++            shape1024 = cond1024.shape
++        }
++        try Task.checkCancellation()
++
++        let metadata: [String: String] = [
++            "schema": "cfp.trellis2-mlx-conditioning.v1",
++            "tier": mode.rawValue,
++            "view_angles": request.viewAngles.map(String.init).joined(separator: ","),
++            "view_count": String(views.count),
++            "conditioner": "DINOv3",
++        ]
++        let artifact = try MLX.saveToData(arrays: arrays, metadata: metadata)
++        var report: [String: Any] = [
++            "schema": metadata["schema"]!,
++            "status": "CONDITIONING_READY",
++            "conditioner": "DINOv3",
++            "tier": mode.rawValue,
++            "view_angles": request.viewAngles,
++            "view_count": views.count,
++            "cond_512_shape": cond512.shape,
++            "elapsed_seconds": -started.timeIntervalSinceNow,
++            "artifact_bytes": artifact.count,
++            "automatic_promotion": false,
++        ]
++        if let shape1024 { report["cond_1024_shape"] = shape1024 }
++        let reportJSON = try JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys])
++        return Trellis2ConditioningResponse(artifact: artifact, reportJSON: reportJSON)
++    }
++
+     // MARK: weight resolution
+
+     /// Resolve the consolidated-snapshot directory: explicit override (flat or `<dir>/<org>/<name>`)
 diff --git a/Sources/fdgparity/main.swift b/Sources/fdgparity/main.swift
 index 005abfb..d01d29c 100644
 --- a/Sources/fdgparity/main.swift
 +++ b/Sources/fdgparity/main.swift
-@@ -32 +32,9 @@ for res in [64, 256] {
+@@ -29,7 +29,15 @@ for res in [64, 256] {
+     let d: [Float] = r.dualVertices.reshaped([-1]).asArray(Float.self)
+     let iRaw: [Bool] = r.intersected.reshaped([-1]).asArray(Bool.self)
+     let order = (0..<n).sorted { a, b in
 -        (c[a*3], c[a*3+1], c[a*3+2]) < (c[b*3], c[b*3+1], c[b*3+2])
 +        let aBase = a * 3
 +        let bBase = b * 3
@@ -322,19 +541,31 @@ index 005abfb..d01d29c 100644
 +            return c[aBase + 1] < c[bBase + 1]
 +        }
 +        return c[aBase + 2] < c[bBase + 2]
+     }
+
+     let gc: [Int32] = try golden("fdg_out_coords_\(res)").reshaped([-1]).asArray(Int32.self)
 diff --git a/Sources/generate/main.swift b/Sources/generate/main.swift
 index 91d0c65..55f681c 100644
 --- a/Sources/generate/main.swift
 +++ b/Sources/generate/main.swift
-@@ -50 +50 @@ log("[generate] DINOv3 cond \(cond.shape) / \(cond1024.shape) computed natively"
+@@ -47,7 +47,7 @@ let (cond1024, negCond1024) = tier.isCascade ? pipe.encodeImage(try golden("dino
+ MLX.eval(cond1024)
+ log("[generate] DINOv3 cond \(cond.shape) / \(cond1024.shape) computed natively")
+
 -let (baked, hrRes, _) = try pipe.generate(
 +let (generated, hrRes, _) = try pipe.generate(
-@@ -59 +59,3 @@ let (baked, hrRes, _) = try pipe.generate(
+     tier: tier,
+     cond: cond, negCond: negCond, cond1024: cond1024, negCond1024: negCond1024,
+     ssNoise: try golden("ss_noise"), ssPhases: try golden("rope_phases_cossin"),
+@@ -56,11 +56,19 @@ let (baked, hrRes, _) = try pipe.generate(
+     yUp: true,   // glTF convention — T0.2: HF/GLB parity is Y-up
+     seed: 0, log: { log($0 + String(format: "   [phys %.1f GB]", physFootprintGB())) })
+
 -log("[generate] baked @\(hrRes): \(baked.vertices.dim(0)) verts, \(baked.faces.dim(0)) faces, atlas \(baked.atlasSize), coverage \(String(format: "%.1f", baked.coverage*100))%")
 +let atlasSummary = generated.atlasSize.map(String.init) ?? "none"
 +let coverageSummary = generated.coverage.map { String(format: "%.1f", $0 * 100) + "%" } ?? "none"
 +log("[generate] generated @\(hrRes): \(generated.vertices.dim(0)) verts, \(generated.faces.dim(0)) faces, atlas \(atlasSummary), coverage \(coverageSummary)")
-@@ -61,3 +63,9 @@ let outURL = URL(fileURLWithPath: "/Users/dustinnielson/Development/mlxengine-3d
+ let outURL = URL(fileURLWithPath: "/Users/dustinnielson/Development/mlxengine-3d/DEV/TrellisDev/texturing/t03_\(tier.rawValue)_native.glb")
 -try GLTFExport.writeGLB(to: outURL, positions: baked.vertices, indices: baked.faces,
 -                        normals: baked.normals, uvs: baked.uvs,
 -                        baseColorRGBA: (baked.texRGBA, baked.atlasSize, baked.atlasSize))
@@ -347,25 +578,42 @@ index 91d0c65..55f681c 100644
 +try GLTFExport.writeGLB(to: outURL, positions: generated.vertices, indices: generated.faces,
 +                        normals: generated.normals, uvs: generated.uvs,
 +                        baseColorRGBA: baseColorRGBA)
-@@ -66 +74 @@ log("[generate] wrote \(outURL.lastPathComponent) (\(bytes) bytes) — total \(S
+ let bytes = (try Data(contentsOf: outURL)).count
+ log("[generate] wrote \(outURL.lastPathComponent) (\(bytes) bytes) — total \(String(format: "%.1f", -t0.timeIntervalSinceNow))s, peak phys \(String(format: "%.2f", peakPhys)) GB")
 -print("GENERATE DONE \(tier.rawValue)@\(hrRes) \(baked.faces.dim(0)) faces \(String(format: "%.0f", -t0.timeIntervalSinceNow))s peakphys \(String(format: "%.2f", peakPhys))GB")
 +print("GENERATE DONE \(tier.rawValue)@\(hrRes) \(generated.faces.dim(0)) faces \(String(format: "%.0f", -t0.timeIntervalSinceNow))s peakphys \(String(format: "%.2f", peakPhys))GB")
 diff --git a/Sources/trellis2-run-engine/main.swift b/Sources/trellis2-run-engine/main.swift
-index 072af6d..1816365 100644
+index 072af6d..cd78f72 100644
 --- a/Sources/trellis2-run-engine/main.swift
 +++ b/Sources/trellis2-run-engine/main.swift
-@@ -19,0 +20,3 @@ import Trellis2Kit
+@@ -17,9 +17,23 @@ import Trellis2Kit
+ //
+ // Env:
+ //   IMG          input PNG/JPEG (required)
 +//   ADDITIONAL_VIEWS_MANIFEST
 +//                optional UTF-8 JSON file containing an ordered array of PNG/JPEG paths.
 +//                These become ImageTo3DRequest.additionalViews after IMG.
-@@ -22,0 +26,6 @@ import Trellis2Kit
+ //   WEIGHTS_DIR  consolidated weights root (the trellis2-consolidate OUT dir) for pre-publish validation
+ //   OUT_GLB      output GLB path (default ./out_mesh_engine.glb)
+ //   HR_RES       512 (default) / 1024 / 1536
 +//   SEED         deterministic UInt64 base RNG seed (default 0)
 +//   TEXTURE      on (default) / off. Off skips texture SLat inference and texture decoding,
 +//                producing a texture-free geometry-focused GLB with no UV atlas.
 +//   ENGINE_MEMORY_FRACTION
 +//                opt-in unified-memory budget fraction, 0.70 (default) ... 0.98.
 +//                Values above 0.70 reduce OS headroom and may cause swapping or termination.
-@@ -46,2 +55,17 @@ let here = FileManager.default.currentDirectoryPath
++//   ENGINE_STAGE  full (default) / conditioning. Conditioning stops after DINOv3 and writes
++//                reusable tensors to OUT_CONDITIONING as MLX-compatible safetensors.
++//   VIEW_ANGLES   comma-separated camera angles matching IMG + additional views.
++//   OUT_CONDITIONING
++//                safetensors destination used by ENGINE_STAGE=conditioning.
+
+ setvbuf(stdout, nil, _IONBF, 0)
+ func gb(_ bytes: UInt64) -> String { String(format: "%.2f GB", Double(bytes) / 1e9) }
+@@ -43,18 +57,73 @@ physTimer.resume()
+
+ let env = ProcessInfo.processInfo.environment
+ let here = FileManager.default.currentDirectoryPath
 -guard let imgPath = env["IMG"], let pngData = FileManager.default.contents(atPath: imgPath) else {
 -    fatalError("set IMG=<png/jpeg> to a readable input image")
 +func loadInputImage(path: String) -> Image {
@@ -385,11 +633,26 @@ index 072af6d..1816365 100644
 +        fatalError("ADDITIONAL_VIEWS_MANIFEST must be a readable UTF-8 JSON array of image paths")
 +    }
 +    additionalViewPaths = decoded
-@@ -48,0 +73 @@ guard let imgPath = env["IMG"], let pngData = FileManager.default.contents(atPat
+ }
 +let additionalViews = additionalViewPaths.map { loadInputImage(path: $0) }
-@@ -50,2 +75,10 @@ let outGLB = env["OUT_GLB"] ?? "\(here)/out_mesh_engine.glb"
+ let outGLB = env["OUT_GLB"] ?? "\(here)/out_mesh_engine.glb"
 -let fmt: Image.Format = imgPath.lowercased().hasSuffix(".jpg") || imgPath.lowercased().hasSuffix(".jpeg") ? .jpeg : .png
 -let image = Image(format: fmt, data: pngData)
++let engineStage = env["ENGINE_STAGE"]?.lowercased() ?? "full"
++guard engineStage == "full" || engineStage == "conditioning" else {
++    fatalError("ENGINE_STAGE must be 'full' or 'conditioning'")
++}
++let defaultAngles = [0, 90, 180, 270]
++let viewAngles: [Int]
++if let raw = env["VIEW_ANGLES"] {
++    viewAngles = raw.split(separator: ",").compactMap { Int($0.trimmingCharacters(in: .whitespaces)) }
++} else {
++    viewAngles = Array(defaultAngles.prefix(1 + additionalViews.count))
++}
++guard viewAngles.count == 1 + additionalViews.count else {
++    fatalError("VIEW_ANGLES count must match IMG + additional views")
++}
++let outConditioning = env["OUT_CONDITIONING"] ?? "\(here)/trellis2_conditioning.safetensors"
 +let defaultMemoryFraction = 0.70
 +let memoryFraction: Double
 +if let raw = env["ENGINE_MEMORY_FRACTION"] {
@@ -400,12 +663,17 @@ index 072af6d..1816365 100644
 +} else {
 +    memoryFraction = defaultMemoryFraction
 +}
-@@ -55,0 +89,4 @@ print("[engine] input image: \(imgPath)")
+
+-print("================ TRELLIS.2 image→3D · ENGINE-DRIVEN e2e ================")
++print("================ TRELLIS.2 \(engineStage) · ENGINE-DRIVEN ================")
+ print("Built with DINOv3.")   // C7 attribution obligation (DINOv3 conditioner)
+ print("[engine] input image: \(imgPath)")
 +print("[engine] input views: \(1 + additionalViews.count)")
++print("[engine] view angles: \(viewAngles)")
 +for (index, path) in additionalViewPaths.enumerated() {
 +    print("[engine] additional view \(index + 1): \(path)")
 +}
-@@ -57 +94,12 @@ print("[engine] input image: \(imgPath)")
+
 -let engine = MLXServeEngine()   // .permissiveOnly runs the two-layer license gate at register
 +let device = DeviceProfile.current()
 +let governor = MemoryGovernor.forDevice(device, fraction: memoryFraction)
@@ -419,7 +687,13 @@ index 072af6d..1816365 100644
 +        memoryFraction
 +    ))
 +}
-@@ -72,0 +121,12 @@ do {
+ print("[engine] device budget: \(gb(await engine.memory.budgetBytes)) | available \(gb(await engine.memory.availableBytes))")
+
+ do {
+@@ -70,6 +139,18 @@ do {
+     if let v = env["TEX_SDPA"] { print("[engine] tex SDPA: \(v)") }
+     let steps = env["STEPS"].flatMap { Int($0) } ?? 12
+     if steps != 12 { print("[engine] sampler steps: \(steps)") }
 +    let seed = env["SEED"].flatMap { UInt64($0) } ?? 0
 +    print("[engine] seed: \(seed)")
 +    let textureEnabled: Bool
@@ -432,16 +706,69 @@ index 072af6d..1816365 100644
 +        fatalError("TEXTURE must be 'on' or 'off'")
 +    }
 +    print("[engine] output mode: \(textureEnabled ? "textured" : "geometry-only")")
-@@ -107,0 +168,2 @@ do {
+     // CFG-cost experiment knobs (shape SLat flows): interval "lo,hi" + vNeg cache stride.
+     if let v = env["SLAT_CFG_INTERVAL"] { print("[engine] slat CFG interval: \(v)") }
+     if let v = env["SLAT_NEG_EVERY"] { print("[engine] slat CFG neg-every: \(v)") }
+@@ -105,6 +186,8 @@ do {
+                                           configuration: Trellis2Configuration(
+                                               weightsRootOverride: weightsOverride,
+                                               steps: steps,
 +                                              seed: seed,
 +                                              texture: textureEnabled,
-@@ -131 +193,8 @@ do {
+                                               unwrapBackend: env["UNWRAP_BACKEND"],
+                                               metricsPath: metricsPath,
+                                               slatCfgAttention: env["HR_SDPA"],
+@@ -128,16 +211,44 @@ do {
+     print("[engine] tier: \(mode.rawValue)")
+
+     let tRun = Date()
 -    let response = try await engine.run(ImageTo3DRequest(image: image, mode: mode), package: pkgID)
-+    let response = try await engine.run(
-+        ImageTo3DRequest(
-+            image: image,
-+            additionalViews: additionalViews.isEmpty ? nil : additionalViews,
-+            mode: mode
-+        ),
-+        package: pkgID
-+    )
+-    guard let resp = response as? ImageTo3DResponse else { fatalError("unexpected response \(type(of: response))") }
+-    try resp.mesh.data.write(to: URL(fileURLWithPath: outGLB))
+-
+-    print(String(format: "[engine] run OK in %.0fs | GPU peak %.2f GB | peak phys %.2f GB",
+-                 -tRun.timeIntervalSinceNow, Double(GPU.peakMemory)/1e9, peakPhys))
+-    print("[engine] mesh: verts=\(resp.mesh.vertexCount ?? -1) faces=\(resp.mesh.faceCount ?? -1) "
+-        + "vertexColors=\(resp.mesh.hasVertexColors) bytes=\(resp.mesh.data.count)")
++    if engineStage == "conditioning" {
++        let response = try await engine.run(
++            Trellis2ConditioningRequest(
++                image: image,
++                additionalViews: additionalViews.isEmpty ? nil : additionalViews,
++                viewAngles: viewAngles,
++                mode: mode
++            ),
++            package: pkgID
++        )
++        guard let resp = response as? Trellis2ConditioningResponse else {
++            fatalError("unexpected conditioning response \(type(of: response))")
++        }
++        try resp.artifact.write(to: URL(fileURLWithPath: outConditioning))
++        try resp.reportJSON.write(to: URL(fileURLWithPath: metricsPath))
++        print(String(format: "[engine] conditioning OK in %.1fs | GPU peak %.2f GB | peak phys %.2f GB",
++                     -tRun.timeIntervalSinceNow, Double(GPU.peakMemory)/1e9, peakPhys))
++        print("[engine] wrote conditioning → \(outConditioning)")
++    } else {
++        let response = try await engine.run(
++            ImageTo3DRequest(
++                image: image,
++                additionalViews: additionalViews.isEmpty ? nil : additionalViews,
++                mode: mode
++            ),
++            package: pkgID
++        )
++        guard let resp = response as? ImageTo3DResponse else {
++            fatalError("unexpected response \(type(of: response))")
++        }
++        try resp.mesh.data.write(to: URL(fileURLWithPath: outGLB))
++        print(String(format: "[engine] run OK in %.0fs | GPU peak %.2f GB | peak phys %.2f GB",
++                     -tRun.timeIntervalSinceNow, Double(GPU.peakMemory)/1e9, peakPhys))
++        print("[engine] mesh: verts=\(resp.mesh.vertexCount ?? -1) faces=\(resp.mesh.faceCount ?? -1) "
++            + "vertexColors=\(resp.mesh.hasVertexColors) bytes=\(resp.mesh.data.count)")
++        print("[engine] wrote GLB → \(outGLB)")
++    }
+     print("[engine] engine-charged footprint(imageTo3D)=\(gb((await engine.memory).residents[.imageTo3D] ?? 0))")
+-    print("[engine] wrote GLB → \(outGLB)")
+
+     // Dump the stage-timing profile (the point of this harness): stages sorted by cost,
+     // each with its share of the end-to-end wall clock. Measure before optimizing.

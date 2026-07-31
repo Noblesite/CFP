@@ -184,6 +184,33 @@ def test_multiview_workflow_uses_three_separate_ordered_views():
     assert 'rec["uv_enabled"] = generated.uvs != nil' in patch_text
     assert 'rec["texture_embedded"] = generated.texRGBA != nil' in patch_text
     assert "baseColorRGBA: baseColorRGBA" in patch_text
+    assert "Trellis2ConditioningRequest" in patch_text
+    assert "MLX.saveToData(arrays: arrays" in patch_text
+    assert 'engineStage == "conditioning"' in patch_text
+
+
+def test_conditioning_workflow_stops_before_sparse_or_mesh_generation():
+    workflow_path = (
+        Path(__file__).parents[1]
+        / "comfyui_trellis2_mlx"
+        / "workflows"
+        / "trellis2_mlx_image_conditioning.json"
+    )
+    workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
+    conditioning = next(
+        node for node in workflow["nodes"] if node["type"] == "Trellis2MLXImageConditioning"
+    )
+    load_nodes = [node for node in workflow["nodes"] if node["type"] == "LoadImage"]
+
+    assert len(load_nodes) == 4
+    assert conditioning["widgets_values"] == ["off"]
+    assert [conditioning["inputs"][index]["link"] for index in (1, 2, 3, 4)] == [2, 4, 6, 8]
+    assert [conditioning["inputs"][index]["link"] for index in (6, 7, 8, 9)] == [3, 5, 7, 9]
+    assert conditioning["outputs"][0]["type"] == "TRELLIS2_MLX_CONDITIONING"
+    assert not any(
+        node["type"] in {"Trellis2MLXImageTo3D", "Trellis2MLXMultiViewTo3D", "SaveGLB"}
+        for node in workflow["nodes"]
+    )
 
 
 def test_multiview_mask_gated_workflow_checks_each_populated_camera_branch():
@@ -818,6 +845,28 @@ def test_build_environment_disables_texture_for_geometry_only(tmp_path):
     assert environment["TEXTURE"] == "off"
 
 
+def test_build_environment_configures_conditioning_stage_and_camera_order(tmp_path):
+    config = Trellis2MLXConfig(Path("/engine"), Path("/weights"), 0.95)
+
+    environment = build_environment(
+        {},
+        config=config,
+        image_path=tmp_path / "000.png",
+        output_path=tmp_path / "conditioning.safetensors",
+        metrics_path=tmp_path / "report.json",
+        seed=0,
+        steps=12,
+        use_matting=False,
+        output_mode="geometry_only",
+        engine_stage="conditioning",
+        view_angles=(0, 90, 180, 270),
+    )
+
+    assert environment["ENGINE_STAGE"] == "conditioning"
+    assert environment["VIEW_ANGLES"] == "0,90,180,270"
+    assert environment["OUT_CONDITIONING"].endswith("conditioning.safetensors")
+
+
 def test_build_environment_rejects_unknown_output_mode(tmp_path):
     config = Trellis2MLXConfig(Path("/engine"), Path("/weights"), 0.95)
 
@@ -887,6 +936,60 @@ printf 'fake engine complete\n'
     assert metrics["artifact_bytes"] == 12
     assert len(metrics["artifact_sha256"]) == 64
     assert log_text == "fake engine complete"
+
+
+def test_run_engine_accepts_conditioning_safetensors(tmp_path):
+    config = make_fake_config(
+        tmp_path,
+        """#!/usr/bin/env python3
+import json
+import os
+
+header = {
+    "cond_512": {"dtype": "F32", "shape": [1, 2, 3], "data_offsets": [0, 24]},
+    "neg_cond_512": {"dtype": "F32", "shape": [1, 2, 3], "data_offsets": [24, 48]},
+}
+encoded = json.dumps(header).encode("utf-8")
+with open(os.environ["OUT_CONDITIONING"], "wb") as artifact:
+    artifact.write(len(encoded).to_bytes(8, "little"))
+    artifact.write(encoded)
+    artifact.write(bytes(48))
+with open(os.environ["METRICS_JSON"], "w", encoding="utf-8") as report:
+    json.dump({"status": "CONDITIONING_READY", "view_count": 4}, report)
+print("fake conditioning complete")
+""",
+    )
+    output_path = tmp_path / "conditioning.safetensors"
+    metrics_path = tmp_path / "conditioning.json"
+    environment = build_environment(
+        os.environ,
+        config=config,
+        image_path=tmp_path / "000.png",
+        output_path=output_path,
+        metrics_path=metrics_path,
+        seed=0,
+        steps=12,
+        use_matting=False,
+        output_mode="geometry_only",
+        engine_stage="conditioning",
+        view_angles=(0, 90, 180, 270),
+    )
+
+    metrics, log_text = run_engine(
+        config=config,
+        environment=environment,
+        output_path=output_path,
+        metrics_path=metrics_path,
+        on_log=lambda _: None,
+        check_cancelled=lambda: None,
+        artifact_kind="safetensors",
+    )
+
+    assert metrics["status"] == "CONDITIONING_READY"
+    assert metrics["view_count"] == 4
+    assert metrics["artifact_kind"] == "safetensors"
+    assert len(metrics["artifact_sha256"]) == 64
+    assert log_text == "fake conditioning complete"
 
 
 def test_run_engine_terminates_subprocess_when_cancelled(tmp_path):

@@ -23,6 +23,14 @@ memory-budget and deterministic-seed CLI patch before building.
 The node unloads cached ComfyUI models before starting Swift because both
 runtimes share unified memory.
 
+`TRELLIS.2 MLX Image Conditioning` is the first modular native-engine stage.
+It accepts approved 000°, 090°, 180°, and 270° views, preprocesses and encodes
+each view independently with DINOv3, concatenates the ordered token sequences,
+and saves `cond_512` plus `neg_cond_512` in MLX-compatible safetensors. It then
+stops: sparse structure, shape, texture, mesh extraction, and GLB export do not
+run. The typed `TRELLIS2_MLX_CONDITIONING` output is reserved for the next
+standalone sparse-generation workflow; automatic promotion is disabled.
+
 ## Install
 
 Run the installer with the target ComfyUI checkout:
@@ -194,6 +202,7 @@ The CFP development install also places it under:
 ComfyUI/user/default/workflows/CFP/CFP_TRELLIS2_MLX_Image_to_3D_v001.json
 ComfyUI/user/default/workflows/CFP/CFP_TRELLIS2_MLX_Background_Clean_v001.json
 ComfyUI/user/default/workflows/CFP/CFP_TRELLIS2_MLX_MultiView_v001.json
+ComfyUI/user/default/workflows/CFP/CFP_TRELLIS2_MLX_Image_Conditioning_v001.json
 ComfyUI/user/default/workflows/CFP/CFP_TRELLIS2_MLX_Geometry_Only_v001.json
 ComfyUI/user/default/workflows/CFP/CFP_TRELLIS2_MLX_Remove_Floaters_v001.json
 ComfyUI/user/default/workflows/CFP/CFP_TRELLIS2_MLX_Topology_Diagnostics_v001.json
