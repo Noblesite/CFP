@@ -1,3 +1,312 @@
+diff --git a/Sources/TRELLIS2/MeshBake.swift b/Sources/TRELLIS2/MeshBake.swift
+index 807bba0..5af2556 100644
+--- a/Sources/TRELLIS2/MeshBake.swift
++++ b/Sources/TRELLIS2/MeshBake.swift
+@@ -25,0 +26,10 @@ public struct BakedMesh {
++/// Geometry-only result from the shared dual-grid extraction and cleanup tail.
++///
++/// This intentionally carries no UVs, texture atlas, material channels, or bake diagnostics.
++/// It is suitable for manufacturing-focused GLB export and for future standalone mesh passes.
++public struct GeometryMesh {
++    public let vertices: MLXArray   // [V,3]
++    public let faces: MLXArray      // [F,3] int32
++    public let normals: MLXArray    // [V,3]
++}
++
+@@ -39,0 +50,66 @@ public enum MeshBake {
++    /// Extract and clean geometry without entering the UV/texture bake pipeline.
++    ///
++    /// The dual-grid surface, DC remesh, optional simplification, winding normalization, and
++    /// vertex-normal generation are shared manufacturing operations. UV unwrap, rasterization,
++    /// surface sampling, atlas writing, and inpainting are deliberately absent.
++    public static func runGeometry(
++        shapeFeats: MLXArray,
++        coords: MLXArray,
++        fineRes: Float,
++        remeshRes: Int = 256,
++        targetFaces: Int = 120_000,
++        log: (String) -> Void = { print($0) }
++    ) -> (GeometryMesh, BakeStageMetrics) {
++        var m = BakeStageMetrics()
++        var t = Date()
++        let margin: Float = 0.5
++        let dualVertices = (1 + 2 * margin) * MLX.sigmoid(shapeFeats[0..., 0..<3]) - margin
++        let intersected = shapeFeats[0..., 3..<6] .> 0
++        let quadLerp = softplus(shapeFeats[0..., 6..<7])
++        let coords3 = coords[0..., 1..<4]
++
++        let (rawVertices, rawFaces) = DualGridMesh.extract(
++            coords: coords3,
++            dualVerts: dualVertices,
++            intersected: intersected,
++            quadLerp: quadLerp,
++            gridSize: fineRes
++        )
++        MLX.eval(rawVertices, rawFaces)
++        var mesh = Mesh(vertices: rawVertices, faces: rawFaces)
++        m.rawDualgridS = -t.timeIntervalSinceNow
++        m.rawFaces = mesh.faceCount
++        log("  raw dual-grid: \(mesh.vertexCount) verts, \(mesh.faceCount) faces")
++
++        t = Date()
++        if remeshRes > 0 {
++            mesh = mesh.remeshDualContouring(resolution: remeshRes)
++            MLX.eval(mesh.vertices, mesh.faces)
++            log("  remeshed: \(mesh.vertexCount) verts, \(mesh.faceCount) faces")
++        } else {
++            log("  remesh skipped: \(mesh.vertexCount) verts, \(mesh.faceCount) faces")
++        }
++        m.remeshS = -t.timeIntervalSinceNow
++        m.remeshFaces = mesh.faceCount
++        m.simplifyFaces = mesh.faceCount
++
++        if mesh.faceCount > targetFaces {
++            t = Date()
++            mesh = mesh.simplify(targetNumFaces: targetFaces)
++            MLX.eval(mesh.vertices, mesh.faces)
++            mesh = mesh.unifyFaceOrientations()
++            MLX.eval(mesh.vertices, mesh.faces)
++            m.simplifyS = -t.timeIntervalSinceNow
++            m.simplifyFaces = mesh.faceCount
++            log("  simplified: \(mesh.vertexCount) verts, \(mesh.faceCount) faces")
++        }
++
++        let normals = mesh.vertexNormals()
++        MLX.eval(mesh.vertices, mesh.faces, normals)
++        m.finalFaces = mesh.faceCount
++        return (
++            GeometryMesh(vertices: mesh.vertices, faces: mesh.faces, normals: normals),
++            m
++        )
++    }
++
+diff --git a/Sources/TRELLIS2/Trellis2Pipeline.swift b/Sources/TRELLIS2/Trellis2Pipeline.swift
+index fdc4283..df8da59 100644
+--- a/Sources/TRELLIS2/Trellis2Pipeline.swift
++++ b/Sources/TRELLIS2/Trellis2Pipeline.swift
+@@ -5,0 +6,89 @@ import MLXRandom
++/// Mesh result shared by the textured and manufacturing-focused geometry lanes.
++///
++/// Geometry-only generation deliberately leaves every texture-related field nil so callers can
++/// export a GLB without UV coordinates, images, samplers, or texture objects.
++public struct GeneratedMesh {
++    public let vertices: MLXArray
++    public let faces: MLXArray
++    public let normals: MLXArray
++    public let uvs: MLXArray?
++    public let texRGBA: [UInt8]?
++    public let atlasSize: Int?
++    public let coverage: Float?
++    public let mrRGBA: [UInt8]?
++    public let filledBeforeInpaint: [Bool]?
++    public let wallFlipped: [Bool]?
++
++    public var isTextured: Bool {
++        uvs != nil && texRGBA != nil && atlasSize != nil
++    }
++
++    public init(baked: BakedMesh) {
++        vertices = baked.vertices
++        faces = baked.faces
++        normals = baked.normals
++        uvs = baked.uvs
++        texRGBA = baked.texRGBA
++        atlasSize = baked.atlasSize
++        coverage = baked.coverage
++        mrRGBA = baked.mrRGBA
++        filledBeforeInpaint = baked.filledBeforeInpaint
++        wallFlipped = baked.wallFlipped
++    }
++
++    public init(geometry: GeometryMesh) {
++        vertices = geometry.vertices
++        faces = geometry.faces
++        normals = geometry.normals
++        uvs = nil
++        texRGBA = nil
++        atlasSize = nil
++        coverage = nil
++        mrRGBA = nil
++        filledBeforeInpaint = nil
++        wallFlipped = nil
++    }
++
++    private init(
++        vertices: MLXArray,
++        faces: MLXArray,
++        normals: MLXArray,
++        uvs: MLXArray?,
++        texRGBA: [UInt8]?,
++        atlasSize: Int?,
++        coverage: Float?,
++        mrRGBA: [UInt8]?,
++        filledBeforeInpaint: [Bool]?,
++        wallFlipped: [Bool]?
++    ) {
++        self.vertices = vertices
++        self.faces = faces
++        self.normals = normals
++        self.uvs = uvs
++        self.texRGBA = texRGBA
++        self.atlasSize = atlasSize
++        self.coverage = coverage
++        self.mrRGBA = mrRGBA
++        self.filledBeforeInpaint = filledBeforeInpaint
++        self.wallFlipped = wallFlipped
++    }
++
++    func reorientedYUp() -> GeneratedMesh {
++        func toYUp(_ array: MLXArray) -> MLXArray {
++            MLX.stacked([array[0..., 0], array[0..., 2], -array[0..., 1]], axis: 1)
++        }
++        return GeneratedMesh(
++            vertices: toYUp(vertices),
++            faces: faces,
++            normals: toYUp(normals),
++            uvs: uvs,
++            texRGBA: texRGBA,
++            atlasSize: atlasSize,
++            coverage: coverage,
++            mrRGBA: mrRGBA,
++            filledBeforeInpaint: filledBeforeInpaint,
++            wallFlipped: wallFlipped
++        )
++    }
++}
++
+@@ -117,2 +206,2 @@ public final class Trellis2Pipeline {
+-    /// `texture` false → geometry-only fast path (skip the tex flow + decoder; flat-gray mesh,
+-    /// ~2× faster). `targetFaces` → decimation target for MeshBake. `yUp` → emit Y-up
++    /// `texture` false → geometry-only fast path (skip the tex flow, decoder, UV unwrap,
++    /// rasterization, and atlas bake). `targetFaces` → decimation target. `yUp` → emit Y-up
+@@ -122 +211 @@ public final class Trellis2Pipeline {
+-    /// Returns the baked mesh and the EFFECTIVE hr resolution (== tier target unless the
++    /// Returns the generated mesh and the EFFECTIVE hr resolution (== tier target unless the
+@@ -136 +225 @@ public final class Trellis2Pipeline {
+-                         log: (String) -> Void = { print($0) }) throws -> (mesh: BakedMesh, hrResolution: Int, metrics: Trellis2StageMetrics) {
++                         log: (String) -> Void = { print($0) }) throws -> (mesh: GeneratedMesh, hrResolution: Int, metrics: Trellis2StageMetrics) {
+@@ -138 +227,7 @@ public final class Trellis2Pipeline {
+-        releaseFlows(keeping: tier.isCascade ? [.shape512, .shape1024, .tex1024] : [.shape512, .tex512])
++        let requiredFlows: Set<FlowKind>
++        if tier.isCascade {
++            requiredFlows = texture ? [.shape512, .shape1024, .tex1024] : [.shape512, .shape1024]
++        } else {
++            requiredFlows = texture ? [.shape512, .tex512] : [.shape512]
++        }
++        releaseFlows(keeping: requiredFlows)
+@@ -145 +240 @@ public final class Trellis2Pipeline {
+-        metrics.backend = unwrapBackend.rawValue
++        metrics.backend = texture ? unwrapBackend.rawValue : "none"
+@@ -261 +356 @@ public final class Trellis2Pipeline {
+-        //      color. `texture=false` skips both stages for a flat-gray geometry-only mesh.
++        //      color. `texture=false` skips both stages and does not synthesize an atlas source.
+@@ -264 +359 @@ public final class Trellis2Pipeline {
+-        let baseColor: MLXArray
++        var baseColor: MLXArray?
+@@ -278,2 +373,3 @@ public final class Trellis2Pipeline {
+-            baseColor = MLX.clip(texOut.feats[0..., 0..<3] * 0.5 + 0.5, min: 0, max: 1)
+-            MLX.eval(baseColor)
++            let decodedColor = MLX.clip(texOut.feats[0..., 0..<3] * 0.5 + 0.5, min: 0, max: 1)
++            MLX.eval(decodedColor)
++            baseColor = decodedColor
+@@ -283,2 +379,2 @@ public final class Trellis2Pipeline {
+-            baseColor = MLXArray.zeros([shapeOut.count, 3]) + 0.5   // flat gray, geometry-only
+-            log("  [4-5] texture off — geometry-only (flat gray)")
++            baseColor = nil
++            log("  [4-5] texture off — skipping texture flow and decoder")
+@@ -287 +383,2 @@ public final class Trellis2Pipeline {
+-        // 6) mesh + texture bake → clean mesh, at the tier's (possibly backed-off) resolution.
++        // 6) Finalize the mesh at the tier's (possibly backed-off) resolution. Textured mode
++        //    enters the full UV/atlas bake; geometry-only mode stops after mesh cleanup + normals.
+@@ -290,4 +387,29 @@ public final class Trellis2Pipeline {
+-        let (bakedInit, bakeMetrics) = try MeshBake.run(shapeFeats: shapeOut.feats, coords: shapeOut.coords, texBaseColor: baseColor,
+-                                     fineRes: Float(hrResolution), remeshRes: remesh,
+-                                     targetFaces: targetFaces, atlasSize: 1024,
+-                                     backend: unwrapBackend, log: log)
++        let generatedInit: GeneratedMesh
++        let bakeMetrics: BakeStageMetrics
++        if let baseColor {
++            let (baked, measured) = try MeshBake.run(
++                shapeFeats: shapeOut.feats,
++                coords: shapeOut.coords,
++                texBaseColor: baseColor,
++                fineRes: Float(hrResolution),
++                remeshRes: remesh,
++                targetFaces: targetFaces,
++                atlasSize: 1024,
++                backend: unwrapBackend,
++                log: log
++            )
++            generatedInit = GeneratedMesh(baked: baked)
++            bakeMetrics = measured
++        } else {
++            let (geometry, measured) = MeshBake.runGeometry(
++                shapeFeats: shapeOut.feats,
++                coords: shapeOut.coords,
++                fineRes: Float(hrResolution),
++                remeshRes: remesh,
++                targetFaces: targetFaces,
++                log: log
++            )
++            generatedInit = GeneratedMesh(geometry: geometry)
++            bakeMetrics = measured
++            log("  [6] geometry finalized without UV unwrap, rasterization, or atlas bake")
++        }
+@@ -296 +418 @@ public final class Trellis2Pipeline {
+-        var baked = bakedInit
++        var generated = generatedInit
+@@ -301,7 +423 @@ public final class Trellis2Pipeline {
+-            func toYUp(_ a: MLXArray) -> MLXArray {
+-                MLX.stacked([a[0..., 0], a[0..., 2], -a[0..., 1]], axis: 1)
+-            }
+-            baked = BakedMesh(vertices: toYUp(baked.vertices), faces: baked.faces, normals: toYUp(baked.normals),
+-                              uvs: baked.uvs, texRGBA: baked.texRGBA, atlasSize: baked.atlasSize, coverage: baked.coverage,
+-                              mrRGBA: baked.mrRGBA,
+-                              filledBeforeInpaint: baked.filledBeforeInpaint, wallFlipped: baked.wallFlipped)
++            generated = generated.reorientedYUp()
+@@ -312 +428 @@ public final class Trellis2Pipeline {
+-        return (baked, hrResolution, metrics)
++        return (generated, hrResolution, metrics)
+diff --git a/Sources/Trellis2Kit/Trellis2Package.swift b/Sources/Trellis2Kit/Trellis2Package.swift
+index 0e8c55e..0642621 100644
+--- a/Sources/Trellis2Kit/Trellis2Package.swift
++++ b/Sources/Trellis2Kit/Trellis2Package.swift
+@@ -33 +33 @@ public struct Trellis2Configuration: PackageConfiguration, ModelStorable, QuantC
+-    /// false = geometry-only flat-gray mesh (skips a 2nd flow + 2nd decode, ~2× faster).
++    /// false = geometry-only mesh (skips texture flow/decode and the UV/atlas bake).
+@@ -444 +444 @@ public final class Trellis2Package: ModelPackage {
+-        let (baked, _, stageMetrics) = try pipeline.generate(
++        let (generated, _, stageMetrics) = try pipeline.generate(
+@@ -465,0 +466,6 @@ public final class Trellis2Package: ModelPackage {
++        let baseColorRGBA: (pixels: [UInt8], width: Int, height: Int)? =
++            if let rgba = generated.texRGBA, let size = generated.atlasSize {
++                (rgba, size, size)
++            } else {
++                nil
++            }
+@@ -467,3 +473,3 @@ public final class Trellis2Package: ModelPackage {
+-            positions: baked.vertices, indices: baked.faces,
+-            normals: baked.normals, uvs: baked.uvs,
+-            baseColorRGBA: (baked.texRGBA, baked.atlasSize, baked.atlasSize))
++            positions: generated.vertices, indices: generated.faces,
++            normals: generated.normals, uvs: generated.uvs,
++            baseColorRGBA: baseColorRGBA)
+@@ -472,2 +478,2 @@ public final class Trellis2Package: ModelPackage {
+-                        vertexCount: baked.vertices.dim(0), faceCount: baked.faces.dim(0),
+-                        hasVertexColors: false)   // UV-textured, not vertex colors
++                        vertexCount: generated.vertices.dim(0), faceCount: generated.faces.dim(0),
++                        hasVertexColors: false)
+@@ -486,3 +492,7 @@ public final class Trellis2Package: ModelPackage {
+-            rec["mesh_verts"] = baked.vertices.dim(0)
+-            rec["mesh_faces"] = baked.faces.dim(0)
+-            rec["atlas_size"] = baked.atlasSize
++            rec["output_mode"] = configuration.texture ? "textured" : "geometry_only"
++            rec["texture_enabled"] = configuration.texture
++            rec["mesh_verts"] = generated.vertices.dim(0)
++            rec["mesh_faces"] = generated.faces.dim(0)
++            rec["atlas_size"] = generated.atlasSize ?? 0
++            rec["uv_enabled"] = generated.uvs != nil
++            rec["texture_embedded"] = generated.texRGBA != nil
 diff --git a/Sources/fdgparity/main.swift b/Sources/fdgparity/main.swift
 index 005abfb..d01d29c 100644
 --- a/Sources/fdgparity/main.swift
@@ -13,20 +322,50 @@ index 005abfb..d01d29c 100644
 +            return c[aBase + 1] < c[bBase + 1]
 +        }
 +        return c[aBase + 2] < c[bBase + 2]
+diff --git a/Sources/generate/main.swift b/Sources/generate/main.swift
+index 91d0c65..55f681c 100644
+--- a/Sources/generate/main.swift
++++ b/Sources/generate/main.swift
+@@ -50 +50 @@ log("[generate] DINOv3 cond \(cond.shape) / \(cond1024.shape) computed natively"
+-let (baked, hrRes, _) = try pipe.generate(
++let (generated, hrRes, _) = try pipe.generate(
+@@ -59 +59,3 @@ let (baked, hrRes, _) = try pipe.generate(
+-log("[generate] baked @\(hrRes): \(baked.vertices.dim(0)) verts, \(baked.faces.dim(0)) faces, atlas \(baked.atlasSize), coverage \(String(format: "%.1f", baked.coverage*100))%")
++let atlasSummary = generated.atlasSize.map(String.init) ?? "none"
++let coverageSummary = generated.coverage.map { String(format: "%.1f", $0 * 100) + "%" } ?? "none"
++log("[generate] generated @\(hrRes): \(generated.vertices.dim(0)) verts, \(generated.faces.dim(0)) faces, atlas \(atlasSummary), coverage \(coverageSummary)")
+@@ -61,3 +63,9 @@ let outURL = URL(fileURLWithPath: "/Users/dustinnielson/Development/mlxengine-3d
+-try GLTFExport.writeGLB(to: outURL, positions: baked.vertices, indices: baked.faces,
+-                        normals: baked.normals, uvs: baked.uvs,
+-                        baseColorRGBA: (baked.texRGBA, baked.atlasSize, baked.atlasSize))
++let baseColorRGBA: (pixels: [UInt8], width: Int, height: Int)? =
++    if let rgba = generated.texRGBA, let size = generated.atlasSize {
++        (rgba, size, size)
++    } else {
++        nil
++    }
++try GLTFExport.writeGLB(to: outURL, positions: generated.vertices, indices: generated.faces,
++                        normals: generated.normals, uvs: generated.uvs,
++                        baseColorRGBA: baseColorRGBA)
+@@ -66 +74 @@ log("[generate] wrote \(outURL.lastPathComponent) (\(bytes) bytes) — total \(S
+-print("GENERATE DONE \(tier.rawValue)@\(hrRes) \(baked.faces.dim(0)) faces \(String(format: "%.0f", -t0.timeIntervalSinceNow))s peakphys \(String(format: "%.2f", peakPhys))GB")
++print("GENERATE DONE \(tier.rawValue)@\(hrRes) \(generated.faces.dim(0)) faces \(String(format: "%.0f", -t0.timeIntervalSinceNow))s peakphys \(String(format: "%.2f", peakPhys))GB")
 diff --git a/Sources/trellis2-run-engine/main.swift b/Sources/trellis2-run-engine/main.swift
-index 072af6d..d2e946f 100644
+index 072af6d..1816365 100644
 --- a/Sources/trellis2-run-engine/main.swift
 +++ b/Sources/trellis2-run-engine/main.swift
 @@ -19,0 +20,3 @@ import Trellis2Kit
 +//   ADDITIONAL_VIEWS_MANIFEST
 +//                optional UTF-8 JSON file containing an ordered array of PNG/JPEG paths.
 +//                These become ImageTo3DRequest.additionalViews after IMG.
-@@ -22,0 +26,4 @@ import Trellis2Kit
+@@ -22,0 +26,6 @@ import Trellis2Kit
 +//   SEED         deterministic UInt64 base RNG seed (default 0)
++//   TEXTURE      on (default) / off. Off skips texture SLat inference and texture decoding,
++//                producing a texture-free geometry-focused GLB with no UV atlas.
 +//   ENGINE_MEMORY_FRACTION
 +//                opt-in unified-memory budget fraction, 0.70 (default) ... 0.98.
 +//                Values above 0.70 reduce OS headroom and may cause swapping or termination.
-@@ -46,2 +53,17 @@ let here = FileManager.default.currentDirectoryPath
+@@ -46,2 +55,17 @@ let here = FileManager.default.currentDirectoryPath
 -guard let imgPath = env["IMG"], let pngData = FileManager.default.contents(atPath: imgPath) else {
 -    fatalError("set IMG=<png/jpeg> to a readable input image")
 +func loadInputImage(path: String) -> Image {
@@ -46,9 +385,9 @@ index 072af6d..d2e946f 100644
 +        fatalError("ADDITIONAL_VIEWS_MANIFEST must be a readable UTF-8 JSON array of image paths")
 +    }
 +    additionalViewPaths = decoded
-@@ -48,0 +71 @@ guard let imgPath = env["IMG"], let pngData = FileManager.default.contents(atPat
+@@ -48,0 +73 @@ guard let imgPath = env["IMG"], let pngData = FileManager.default.contents(atPat
 +let additionalViews = additionalViewPaths.map { loadInputImage(path: $0) }
-@@ -50,2 +73,10 @@ let outGLB = env["OUT_GLB"] ?? "\(here)/out_mesh_engine.glb"
+@@ -50,2 +75,10 @@ let outGLB = env["OUT_GLB"] ?? "\(here)/out_mesh_engine.glb"
 -let fmt: Image.Format = imgPath.lowercased().hasSuffix(".jpg") || imgPath.lowercased().hasSuffix(".jpeg") ? .jpeg : .png
 -let image = Image(format: fmt, data: pngData)
 +let defaultMemoryFraction = 0.70
@@ -61,12 +400,12 @@ index 072af6d..d2e946f 100644
 +} else {
 +    memoryFraction = defaultMemoryFraction
 +}
-@@ -55,0 +87,4 @@ print("[engine] input image: \(imgPath)")
+@@ -55,0 +89,4 @@ print("[engine] input image: \(imgPath)")
 +print("[engine] input views: \(1 + additionalViews.count)")
 +for (index, path) in additionalViewPaths.enumerated() {
 +    print("[engine] additional view \(index + 1): \(path)")
 +}
-@@ -57 +92,12 @@ print("[engine] input image: \(imgPath)")
+@@ -57 +94,12 @@ print("[engine] input image: \(imgPath)")
 -let engine = MLXServeEngine()   // .permissiveOnly runs the two-layer license gate at register
 +let device = DeviceProfile.current()
 +let governor = MemoryGovernor.forDevice(device, fraction: memoryFraction)
@@ -80,12 +419,23 @@ index 072af6d..d2e946f 100644
 +        memoryFraction
 +    ))
 +}
-@@ -72,0 +119,2 @@ do {
+@@ -72,0 +121,12 @@ do {
 +    let seed = env["SEED"].flatMap { UInt64($0) } ?? 0
 +    print("[engine] seed: \(seed)")
-@@ -107,0 +156 @@ do {
++    let textureEnabled: Bool
++    switch env["TEXTURE"]?.lowercased() {
++    case nil, "on":
++        textureEnabled = true
++    case "off":
++        textureEnabled = false
++    default:
++        fatalError("TEXTURE must be 'on' or 'off'")
++    }
++    print("[engine] output mode: \(textureEnabled ? "textured" : "geometry-only")")
+@@ -107,0 +168,2 @@ do {
 +                                              seed: seed,
-@@ -131 +180,8 @@ do {
++                                              texture: textureEnabled,
+@@ -131 +193,8 @@ do {
 -    let response = try await engine.run(ImageTo3DRequest(image: image, mode: mode), package: pkgID)
 +    let response = try await engine.run(
 +        ImageTo3DRequest(

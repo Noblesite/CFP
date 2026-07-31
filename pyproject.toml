@@ -16,7 +16,13 @@ dependencies = []
 cfp = "cfp.cli:main"
 
 [dependency-groups]
-dev = ["numpy>=2.0", "pytest>=8.3", "trimesh>=4.0"]
+dev = [
+  "numpy>=2.0",
+  "pytest>=8.3",
+  "scikit-image>=0.25",
+  "scipy>=1.15",
+  "trimesh>=4.0",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/cfp"]

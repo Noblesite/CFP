@@ -11,3 +11,12 @@ build/
 # Hugging Face repository out of CFP history.
 trellis2-mlx/
 mlx-trellis2-swift/
+
+# Local upstream/reference checkouts used for implementation research. These
+# remain independent repositories and must not be vendored into CFP history.
+ComfyUI-Trellis2-visualbruno/
+flux.swift-mzbac.swift/
+
+# Local character and part references may carry copyrighted or private source
+# artwork. Workflow fixtures should use explicit test assets instead.
+img/

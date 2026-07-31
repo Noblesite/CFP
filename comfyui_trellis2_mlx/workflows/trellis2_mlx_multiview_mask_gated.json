@@ -1,0 +1,1480 @@
+{
+  "id": "cfp-trellis2-mlx-multiview-mask-gated-v001",
+  "revision": 0,
+  "last_node_id": 15,
+  "last_link_id": 18,
+  "nodes": [
+    {
+      "id": 7,
+      "type": "MarkdownNote",
+      "pos": [
+        -1150,
+        -480
+      ],
+      "size": [
+        700,
+        250
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {},
+      "widgets_values": [
+        "# TRELLIS.2 multi-view model-sheet input\n\nLoad separate images for Camera 000° (front), 090° (left), and 180° (rear). Keep pose, scale, centerline, lighting, and canvas dimensions consistent.\n\nEach view is background-cleaned independently, encoded independently by DINOv3, and combined as one ordered conditioning context. Do not use a flattened contact sheet here; keep that artifact for human review only.\n\nThe 270° input remains optional on the generation node for the next experiment.\n\nEach populated camera branch passes through an independent CFP Input Mask Quality Gate. One blocked view stops reconstruction before the native engine starts. RMBG MASK sockets remain disconnected because the gates derive standard ComfyUI mask polarity from RGBA alpha."
+      ],
+      "color": "#493b1f",
+      "bgcolor": "#6a5730",
+      "title": "Model Sheet Input Contract"
+    },
+    {
+      "id": 1,
+      "type": "LoadImage",
+      "title": "Load Camera 000° — Front",
+      "pos": [
+        -1150,
+        -170
+      ],
+      "size": [
+        315,
+        314
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "COMBO",
+          "widget": {
+            "name": "image"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "choose file to upload",
+          "name": "upload",
+          "type": "IMAGEUPLOAD",
+          "widget": {
+            "name": "upload"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "slot_index": 0,
+          "links": [
+            1
+          ]
+        },
+        {
+          "localized_name": "MASK",
+          "name": "MASK",
+          "type": "MASK",
+          "slot_index": 1,
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.5.1",
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "",
+        "image"
+      ]
+    },
+    {
+      "id": 2,
+      "type": "RMBG",
+      "title": "Background Clean 000°",
+      "pos": [
+        -790,
+        -170
+      ],
+      "size": [
+        340,
+        292
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "slot_index": 0,
+          "links": [
+            7
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "slot_index": 1,
+          "links": null
+        },
+        {
+          "name": "MASK_IMAGE",
+          "type": "IMAGE",
+          "slot_index": 2,
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-rmbg",
+        "ver": "112fd6141d07663d5e4a35d66d269542b58f4438",
+        "Node name for S&R": "RMBG",
+        "models": [
+          {
+            "name": "BiRefNet_config.py",
+            "url": "https://huggingface.co/briaai/RMBG-2.0/resolve/main/BiRefNet_config.py",
+            "directory": "RMBG/RMBG-2.0"
+          },
+          {
+            "name": "birefnet.py",
+            "url": "https://huggingface.co/briaai/RMBG-2.0/resolve/main/birefnet.py",
+            "directory": "RMBG/RMBG-2.0"
+          },
+          {
+            "name": "config.json",
+            "url": "https://huggingface.co/briaai/RMBG-2.0/resolve/main/config.json",
+            "directory": "RMBG/RMBG-2.0"
+          },
+          {
+            "name": "model.safetensors",
+            "url": "https://huggingface.co/briaai/RMBG-2.0/resolve/main/model.safetensors",
+            "directory": "RMBG/RMBG-2.0"
+          }
+        ]
+      },
+      "widgets_values": [
+        "RMBG-2.0",
+        1,
+        1024,
+        0,
+        0,
+        false,
+        false,
+        "Alpha",
+        "#222222"
+      ],
+      "color": "#222e40",
+      "bgcolor": "#364254"
+    },
+    {
+      "id": 3,
+      "type": "LoadImage",
+      "title": "Load Camera 090° — Left",
+      "pos": [
+        -1150,
+        190
+      ],
+      "size": [
+        315,
+        314
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "COMBO",
+          "widget": {
+            "name": "image"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "choose file to upload",
+          "name": "upload",
+          "type": "IMAGEUPLOAD",
+          "widget": {
+            "name": "upload"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "slot_index": 0,
+          "links": [
+            2
+          ]
+        },
+        {
+          "localized_name": "MASK",
+          "name": "MASK",
+          "type": "MASK",
+          "slot_index": 1,
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.5.1",
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "",
+        "image"
+      ]
+    },
+    {
+      "id": 4,
+      "type": "RMBG",
+      "title": "Background Clean 090°",
+      "pos": [
+        -790,
+        190
+      ],
+      "size": [
+        340,
+        292
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 2
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "slot_index": 0,
+          "links": [
+            8
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "slot_index": 1,
+          "links": null
+        },
+        {
+          "name": "MASK_IMAGE",
+          "type": "IMAGE",
+          "slot_index": 2,
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-rmbg",
+        "ver": "112fd6141d07663d5e4a35d66d269542b58f4438",
+        "Node name for S&R": "RMBG",
+        "models": [
+          {
+            "name": "BiRefNet_config.py",
+            "url": "https://huggingface.co/briaai/RMBG-2.0/resolve/main/BiRefNet_config.py",
+            "directory": "RMBG/RMBG-2.0"
+          },
+          {
+            "name": "birefnet.py",
+            "url": "https://huggingface.co/briaai/RMBG-2.0/resolve/main/birefnet.py",
+            "directory": "RMBG/RMBG-2.0"
+          },
+          {
+            "name": "config.json",
+            "url": "https://huggingface.co/briaai/RMBG-2.0/resolve/main/config.json",
+            "directory": "RMBG/RMBG-2.0"
+          },
+          {
+            "name": "model.safetensors",
+            "url": "https://huggingface.co/briaai/RMBG-2.0/resolve/main/model.safetensors",
+            "directory": "RMBG/RMBG-2.0"
+          }
+        ]
+      },
+      "widgets_values": [
+        "RMBG-2.0",
+        1,
+        1024,
+        0,
+        0,
+        false,
+        false,
+        "Alpha",
+        "#222222"
+      ],
+      "color": "#222e40",
+      "bgcolor": "#364254"
+    },
+    {
+      "id": 5,
+      "type": "LoadImage",
+      "title": "Load Camera 180° — Rear",
+      "pos": [
+        -1150,
+        550
+      ],
+      "size": [
+        315,
+        314
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "COMBO",
+          "widget": {
+            "name": "image"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "choose file to upload",
+          "name": "upload",
+          "type": "IMAGEUPLOAD",
+          "widget": {
+            "name": "upload"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "slot_index": 0,
+          "links": [
+            3
+          ]
+        },
+        {
+          "localized_name": "MASK",
+          "name": "MASK",
+          "type": "MASK",
+          "slot_index": 1,
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.5.1",
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "",
+        "image"
+      ]
+    },
+    {
+      "id": 6,
+      "type": "RMBG",
+      "title": "Background Clean 180°",
+      "pos": [
+        -790,
+        550
+      ],
+      "size": [
+        340,
+        292
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 3
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "slot_index": 0,
+          "links": [
+            9
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "slot_index": 1,
+          "links": null
+        },
+        {
+          "name": "MASK_IMAGE",
+          "type": "IMAGE",
+          "slot_index": 2,
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-rmbg",
+        "ver": "112fd6141d07663d5e4a35d66d269542b58f4438",
+        "Node name for S&R": "RMBG",
+        "models": [
+          {
+            "name": "BiRefNet_config.py",
+            "url": "https://huggingface.co/briaai/RMBG-2.0/resolve/main/BiRefNet_config.py",
+            "directory": "RMBG/RMBG-2.0"
+          },
+          {
+            "name": "birefnet.py",
+            "url": "https://huggingface.co/briaai/RMBG-2.0/resolve/main/birefnet.py",
+            "directory": "RMBG/RMBG-2.0"
+          },
+          {
+            "name": "config.json",
+            "url": "https://huggingface.co/briaai/RMBG-2.0/resolve/main/config.json",
+            "directory": "RMBG/RMBG-2.0"
+          },
+          {
+            "name": "model.safetensors",
+            "url": "https://huggingface.co/briaai/RMBG-2.0/resolve/main/model.safetensors",
+            "directory": "RMBG/RMBG-2.0"
+          }
+        ]
+      },
+      "widgets_values": [
+        "RMBG-2.0",
+        1,
+        1024,
+        0,
+        0,
+        false,
+        false,
+        "Alpha",
+        "#222222"
+      ],
+      "color": "#222e40",
+      "bgcolor": "#364254"
+    },
+    {
+      "id": 8,
+      "type": "Trellis2MLXModel",
+      "pos": [
+        -300,
+        980
+      ],
+      "size": [
+        430,
+        150
+      ],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "engine_binary",
+          "name": "engine_binary",
+          "type": "STRING",
+          "widget": {
+            "name": "engine_binary"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "weights_directory",
+          "name": "weights_directory",
+          "type": "STRING",
+          "widget": {
+            "name": "weights_directory"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "memory_fraction",
+          "name": "memory_fraction",
+          "type": "FLOAT",
+          "widget": {
+            "name": "memory_fraction"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "mlx_config",
+          "name": "mlx_config",
+          "type": "TRELLIS2_MLX_CONFIG",
+          "links": [
+            4
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "Trellis2MLXModel"
+      },
+      "widgets_values": [
+        "auto",
+        "auto",
+        0.95
+      ]
+    },
+    {
+      "id": 9,
+      "type": "Trellis2MLXMultiViewTo3D",
+      "pos": [
+        200,
+        180
+      ],
+      "size": [
+        470,
+        410
+      ],
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "mlx_config",
+          "name": "mlx_config",
+          "type": "TRELLIS2_MLX_CONFIG",
+          "link": 4
+        },
+        {
+          "localized_name": "image_000",
+          "name": "image_000",
+          "type": "IMAGE",
+          "link": 13
+        },
+        {
+          "localized_name": "image_090",
+          "name": "image_090",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": 14
+        },
+        {
+          "localized_name": "image_180",
+          "name": "image_180",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": 15
+        },
+        {
+          "localized_name": "image_270",
+          "name": "image_270",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "localized_name": "seed",
+          "name": "seed",
+          "type": "INT",
+          "widget": {
+            "name": "seed"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "steps",
+          "name": "steps",
+          "type": "INT",
+          "widget": {
+            "name": "steps"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "output_mode",
+          "name": "output_mode",
+          "type": "COMBO",
+          "widget": {
+            "name": "output_mode"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "matting",
+          "name": "matting",
+          "type": "COMBO",
+          "widget": {
+            "name": "matting"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "mask_000",
+          "name": "mask_000",
+          "shape": 7,
+          "type": "MASK",
+          "link": 16
+        },
+        {
+          "localized_name": "mask_090",
+          "name": "mask_090",
+          "shape": 7,
+          "type": "MASK",
+          "link": 17
+        },
+        {
+          "localized_name": "mask_180",
+          "name": "mask_180",
+          "shape": 7,
+          "type": "MASK",
+          "link": 18
+        },
+        {
+          "localized_name": "mask_270",
+          "name": "mask_270",
+          "shape": 7,
+          "type": "MASK",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "model_3d",
+          "name": "model_3d",
+          "type": "FILE_3D_GLB",
+          "slot_index": 0,
+          "links": [
+            10,
+            11,
+            12
+          ]
+        },
+        {
+          "localized_name": "artifact_path",
+          "name": "artifact_path",
+          "type": "STRING",
+          "slot_index": 1,
+          "links": null
+        },
+        {
+          "localized_name": "metrics_json",
+          "name": "metrics_json",
+          "type": "STRING",
+          "slot_index": 2,
+          "links": null
+        },
+        {
+          "localized_name": "engine_log",
+          "name": "engine_log",
+          "type": "STRING",
+          "slot_index": 3,
+          "links": null
+        },
+        {
+          "localized_name": "artifact_sha256",
+          "name": "artifact_sha256",
+          "type": "STRING",
+          "slot_index": 4,
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "Trellis2MLXMultiViewTo3D"
+      },
+      "widgets_values": [
+        0,
+        "fixed",
+        12,
+        "textured",
+        "off"
+      ]
+    },
+    {
+      "id": 10,
+      "type": "Preview3D",
+      "pos": [
+        750,
+        -150
+      ],
+      "size": [
+        520,
+        620
+      ],
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "camera_info",
+          "name": "camera_info",
+          "shape": 7,
+          "type": "LOAD3D_CAMERA",
+          "link": null
+        },
+        {
+          "localized_name": "bg_image",
+          "name": "bg_image",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "localized_name": "model_file",
+          "name": "model_file",
+          "type": "STRING,FILE_3D_GLB,FILE_3D_GLTF,FILE_3D_FBX,FILE_3D_OBJ,FILE_3D_STL,FILE_3D_USDZ,FILE_3D",
+          "widget": {
+            "name": "model_file"
+          },
+          "link": 10
+        },
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "PREVIEW_3D",
+          "widget": {
+            "name": "image"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.5.1",
+        "Node name for S&R": "Preview3D",
+        "Scene Config": {
+          "showGrid": true,
+          "backgroundColor": "#282828",
+          "backgroundImage": "",
+          "backgroundRenderMode": "tiled"
+        },
+        "Light Config": {
+          "intensity": 3
+        }
+      },
+      "widgets_values": [
+        "",
+        ""
+      ]
+    },
+    {
+      "id": 11,
+      "type": "SaveGLB",
+      "pos": [
+        1320,
+        70
+      ],
+      "size": [
+        420,
+        280
+      ],
+      "flags": {},
+      "order": 13,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "mesh",
+          "name": "mesh",
+          "type": "MESH,FILE_3D_GLB,FILE_3D_GLTF,FILE_3D_OBJ,FILE_3D_FBX,FILE_3D_STL,FILE_3D_USDZ,FILE_3D_PLY,FILE_3D_SPLAT,FILE_3D_SPZ,FILE_3D_KSPLAT,FILE_3D_SPLAT_ANY,FILE_3D_POINT_CLOUD_ANY,FILE_3D",
+          "link": 11
+        },
+        {
+          "localized_name": "filename_prefix",
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "PREVIEW_3D",
+          "widget": {
+            "name": "image"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.5.1",
+        "Node name for S&R": "SaveGLB"
+      },
+      "widgets_values": [
+        "CFP/TRELLIS2_MLX_MULTIVIEW",
+        ""
+      ]
+    },
+    {
+      "id": 12,
+      "type": "Trellis2MLXMeshReport",
+      "pos": [
+        1320,
+        420
+      ],
+      "size": [
+        470,
+        360
+      ],
+      "flags": {},
+      "order": 14,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "model_3d",
+          "name": "model_3d",
+          "type": "FILE_3D_GLB",
+          "link": 12
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "report",
+          "name": "report",
+          "type": "STRING",
+          "slot_index": 0,
+          "links": null
+        },
+        {
+          "localized_name": "report_json",
+          "name": "report_json",
+          "type": "STRING",
+          "slot_index": 1,
+          "links": null
+        },
+        {
+          "localized_name": "status",
+          "name": "status",
+          "type": "STRING",
+          "slot_index": 2,
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "Trellis2MLXMeshReport"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 13,
+      "type": "Trellis2MLXInputMaskQualityGate",
+      "pos": [
+        -360,
+        -170
+      ],
+      "size": [
+        460,
+        340
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "IMAGE",
+          "link": 7
+        },
+        {
+          "localized_name": "alpha_threshold",
+          "name": "alpha_threshold",
+          "type": "FLOAT",
+          "widget": {
+            "name": "alpha_threshold"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "min_foreground_fraction",
+          "name": "min_foreground_fraction",
+          "type": "FLOAT",
+          "widget": {
+            "name": "min_foreground_fraction"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "max_foreground_fraction",
+          "name": "max_foreground_fraction",
+          "type": "FLOAT",
+          "widget": {
+            "name": "max_foreground_fraction"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "max_border_contact_fraction",
+          "name": "max_border_contact_fraction",
+          "type": "FLOAT",
+          "widget": {
+            "name": "max_border_contact_fraction"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "max_minor_component_fraction",
+          "name": "max_minor_component_fraction",
+          "type": "FLOAT",
+          "widget": {
+            "name": "max_minor_component_fraction"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "acknowledge_suspicious_mask",
+          "name": "acknowledge_suspicious_mask",
+          "type": "COMBO",
+          "widget": {
+            "name": "acknowledge_suspicious_mask"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "mask",
+          "name": "mask",
+          "shape": 7,
+          "type": "MASK",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "IMAGE",
+          "slot_index": 0,
+          "links": [
+            13
+          ]
+        },
+        {
+          "localized_name": "mask",
+          "name": "mask",
+          "type": "MASK",
+          "slot_index": 1,
+          "links": [
+            16
+          ]
+        },
+        {
+          "localized_name": "mask_report",
+          "name": "mask_report",
+          "type": "STRING",
+          "slot_index": 2,
+          "links": null
+        },
+        {
+          "localized_name": "mask_report_json",
+          "name": "mask_report_json",
+          "type": "STRING",
+          "slot_index": 3,
+          "links": null
+        },
+        {
+          "localized_name": "status",
+          "name": "status",
+          "type": "STRING",
+          "slot_index": 4,
+          "links": null
+        }
+      ],
+      "title": "Mask Gate 000° — Front",
+      "properties": {
+        "Node name for S&R": "Trellis2MLXInputMaskQualityGate"
+      },
+      "widgets_values": [
+        0.5,
+        0.05,
+        0.85,
+        0.1,
+        0.02,
+        "no"
+      ]
+    },
+    {
+      "id": 14,
+      "type": "Trellis2MLXInputMaskQualityGate",
+      "pos": [
+        -360,
+        190
+      ],
+      "size": [
+        460,
+        340
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "IMAGE",
+          "link": 8
+        },
+        {
+          "localized_name": "alpha_threshold",
+          "name": "alpha_threshold",
+          "type": "FLOAT",
+          "widget": {
+            "name": "alpha_threshold"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "min_foreground_fraction",
+          "name": "min_foreground_fraction",
+          "type": "FLOAT",
+          "widget": {
+            "name": "min_foreground_fraction"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "max_foreground_fraction",
+          "name": "max_foreground_fraction",
+          "type": "FLOAT",
+          "widget": {
+            "name": "max_foreground_fraction"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "max_border_contact_fraction",
+          "name": "max_border_contact_fraction",
+          "type": "FLOAT",
+          "widget": {
+            "name": "max_border_contact_fraction"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "max_minor_component_fraction",
+          "name": "max_minor_component_fraction",
+          "type": "FLOAT",
+          "widget": {
+            "name": "max_minor_component_fraction"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "acknowledge_suspicious_mask",
+          "name": "acknowledge_suspicious_mask",
+          "type": "COMBO",
+          "widget": {
+            "name": "acknowledge_suspicious_mask"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "mask",
+          "name": "mask",
+          "shape": 7,
+          "type": "MASK",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "IMAGE",
+          "slot_index": 0,
+          "links": [
+            14
+          ]
+        },
+        {
+          "localized_name": "mask",
+          "name": "mask",
+          "type": "MASK",
+          "slot_index": 1,
+          "links": [
+            17
+          ]
+        },
+        {
+          "localized_name": "mask_report",
+          "name": "mask_report",
+          "type": "STRING",
+          "slot_index": 2,
+          "links": null
+        },
+        {
+          "localized_name": "mask_report_json",
+          "name": "mask_report_json",
+          "type": "STRING",
+          "slot_index": 3,
+          "links": null
+        },
+        {
+          "localized_name": "status",
+          "name": "status",
+          "type": "STRING",
+          "slot_index": 4,
+          "links": null
+        }
+      ],
+      "title": "Mask Gate 090° — Left",
+      "properties": {
+        "Node name for S&R": "Trellis2MLXInputMaskQualityGate"
+      },
+      "widgets_values": [
+        0.5,
+        0.05,
+        0.85,
+        0.1,
+        0.02,
+        "no"
+      ]
+    },
+    {
+      "id": 15,
+      "type": "Trellis2MLXInputMaskQualityGate",
+      "pos": [
+        -360,
+        550
+      ],
+      "size": [
+        460,
+        340
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "IMAGE",
+          "link": 9
+        },
+        {
+          "localized_name": "alpha_threshold",
+          "name": "alpha_threshold",
+          "type": "FLOAT",
+          "widget": {
+            "name": "alpha_threshold"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "min_foreground_fraction",
+          "name": "min_foreground_fraction",
+          "type": "FLOAT",
+          "widget": {
+            "name": "min_foreground_fraction"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "max_foreground_fraction",
+          "name": "max_foreground_fraction",
+          "type": "FLOAT",
+          "widget": {
+            "name": "max_foreground_fraction"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "max_border_contact_fraction",
+          "name": "max_border_contact_fraction",
+          "type": "FLOAT",
+          "widget": {
+            "name": "max_border_contact_fraction"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "max_minor_component_fraction",
+          "name": "max_minor_component_fraction",
+          "type": "FLOAT",
+          "widget": {
+            "name": "max_minor_component_fraction"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "acknowledge_suspicious_mask",
+          "name": "acknowledge_suspicious_mask",
+          "type": "COMBO",
+          "widget": {
+            "name": "acknowledge_suspicious_mask"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "mask",
+          "name": "mask",
+          "shape": 7,
+          "type": "MASK",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "IMAGE",
+          "slot_index": 0,
+          "links": [
+            15
+          ]
+        },
+        {
+          "localized_name": "mask",
+          "name": "mask",
+          "type": "MASK",
+          "slot_index": 1,
+          "links": [
+            18
+          ]
+        },
+        {
+          "localized_name": "mask_report",
+          "name": "mask_report",
+          "type": "STRING",
+          "slot_index": 2,
+          "links": null
+        },
+        {
+          "localized_name": "mask_report_json",
+          "name": "mask_report_json",
+          "type": "STRING",
+          "slot_index": 3,
+          "links": null
+        },
+        {
+          "localized_name": "status",
+          "name": "status",
+          "type": "STRING",
+          "slot_index": 4,
+          "links": null
+        }
+      ],
+      "title": "Mask Gate 180° — Rear",
+      "properties": {
+        "Node name for S&R": "Trellis2MLXInputMaskQualityGate"
+      },
+      "widgets_values": [
+        0.5,
+        0.05,
+        0.85,
+        0.1,
+        0.02,
+        "no"
+      ]
+    }
+  ],
+  "links": [
+    [
+      1,
+      1,
+      0,
+      2,
+      0,
+      "IMAGE"
+    ],
+    [
+      2,
+      3,
+      0,
+      4,
+      0,
+      "IMAGE"
+    ],
+    [
+      3,
+      5,
+      0,
+      6,
+      0,
+      "IMAGE"
+    ],
+    [
+      4,
+      8,
+      0,
+      9,
+      0,
+      "TRELLIS2_MLX_CONFIG"
+    ],
+    [
+      10,
+      9,
+      0,
+      10,
+      2,
+      "FILE_3D_GLB"
+    ],
+    [
+      11,
+      9,
+      0,
+      11,
+      0,
+      "FILE_3D_GLB"
+    ],
+    [
+      12,
+      9,
+      0,
+      12,
+      0,
+      "FILE_3D_GLB"
+    ],
+    [
+      7,
+      2,
+      0,
+      13,
+      0,
+      "IMAGE"
+    ],
+    [
+      8,
+      4,
+      0,
+      14,
+      0,
+      "IMAGE"
+    ],
+    [
+      9,
+      6,
+      0,
+      15,
+      0,
+      "IMAGE"
+    ],
+    [
+      13,
+      13,
+      0,
+      9,
+      1,
+      "IMAGE"
+    ],
+    [
+      14,
+      14,
+      0,
+      9,
+      2,
+      "IMAGE"
+    ],
+    [
+      15,
+      15,
+      0,
+      9,
+      3,
+      "IMAGE"
+    ],
+    [
+      16,
+      13,
+      1,
+      9,
+      9,
+      "MASK"
+    ],
+    [
+      17,
+      14,
+      1,
+      9,
+      10,
+      "MASK"
+    ],
+    [
+      18,
+      15,
+      1,
+      9,
+      11,
+      "MASK"
+    ]
+  ],
+  "groups": [
+    {
+      "id": 1,
+      "title": "01 — MODEL SHEET VIEWS, RMBG, AND MASK GATES",
+      "bounding": [
+        -1200,
+        -530,
+        1350,
+        1470
+      ],
+      "color": "#3f789e",
+      "font_size": 24,
+      "flags": {}
+    },
+    {
+      "id": 2,
+      "title": "02 — NATIVE MLX CONFIGURATION",
+      "bounding": [
+        -350,
+        930,
+        530,
+        250
+      ],
+      "color": "#8a6f42",
+      "font_size": 24,
+      "flags": {}
+    },
+    {
+      "id": 3,
+      "title": "03 — TRELLIS.2 MLX MULTI-VIEW RECONSTRUCTION",
+      "bounding": [
+        150,
+        120,
+        570,
+        540
+      ],
+      "color": "#6b4b8a",
+      "font_size": 24,
+      "flags": {}
+    },
+    {
+      "id": 4,
+      "title": "04 — REVIEW, REPORT, AND SAVE",
+      "bounding": [
+        700,
+        -210,
+        1130,
+        1050
+      ],
+      "color": "#4d8061",
+      "font_size": 24,
+      "flags": {}
+    }
+  ],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.65,
+      "offset": [
+        830,
+        390
+      ]
+    },
+    "frontendVersion": "1.30.6",
+    "workflowRendererVersion": "LG"
+  },
+  "version": 0.4
+}

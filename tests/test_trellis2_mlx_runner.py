@@ -81,11 +81,41 @@ def test_background_workflow_embeds_official_rmbg_model_metadata():
     assert "Commercial use requires a separate agreement with BRIA" in markdown
 
 
+def test_input_mask_quality_workflow_gates_rmbg_alpha_before_inference():
+    workflow_path = (
+        Path(__file__).parents[1]
+        / "comfyui_trellis2_mlx"
+        / "workflows"
+        / "trellis2_mlx_input_mask_quality_gate.json"
+    )
+    workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
+    rmbg = next(node for node in workflow["nodes"] if node["type"] == "RMBG")
+    gate = next(
+        node
+        for node in workflow["nodes"]
+        if node["type"] == "Trellis2MLXInputMaskQualityGate"
+    )
+    generator = next(
+        node for node in workflow["nodes"] if node["type"] == "Trellis2MLXImageTo3D"
+    )
+
+    assert gate["widgets_values"] == [0.5, 0.05, 0.85, 0.1, 0.02, "no"]
+    assert rmbg["outputs"][0]["links"] == [3]
+    assert rmbg["outputs"][1]["links"] is None
+    assert gate["inputs"][0]["link"] == 3
+    assert gate["inputs"][7]["link"] is None
+    assert generator["inputs"][1]["link"] == 7
+    assert generator["inputs"][6]["link"] == 8
+    assert gate["outputs"][0]["links"] == [7]
+    assert gate["outputs"][1]["links"] == [8]
+
+
 @pytest.mark.parametrize(
     "workflow_name",
     [
         "trellis2_mlx_image_to_3d.json",
         "trellis2_mlx_background_clean.json",
+        "trellis2_mlx_geometry_only.json",
     ],
 )
 def test_trellis_workflows_include_mesh_report_checkpoint(workflow_name):
@@ -146,6 +176,576 @@ def test_multiview_workflow_uses_three_separate_ordered_views():
     ).read_text(encoding="utf-8")
     assert "ADDITIONAL_VIEWS_MANIFEST" in patch_text
     assert "additionalViews: additionalViews.isEmpty ? nil : additionalViews" in patch_text
+    assert 'switch env["TEXTURE"]?.lowercased()' in patch_text
+    assert "texture: textureEnabled" in patch_text
+    assert 'rec["output_mode"] = configuration.texture ? "textured" : "geometry_only"' in patch_text
+    assert "MeshBake.runGeometry(" in patch_text
+    assert 'metrics.backend = texture ? unwrapBackend.rawValue : "none"' in patch_text
+    assert 'rec["uv_enabled"] = generated.uvs != nil' in patch_text
+    assert 'rec["texture_embedded"] = generated.texRGBA != nil' in patch_text
+    assert "baseColorRGBA: baseColorRGBA" in patch_text
+
+
+def test_multiview_mask_gated_workflow_checks_each_populated_camera_branch():
+    workflow_path = (
+        Path(__file__).parents[1]
+        / "comfyui_trellis2_mlx"
+        / "workflows"
+        / "trellis2_mlx_multiview_mask_gated.json"
+    )
+    workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
+    gates = sorted(
+        (
+            node
+            for node in workflow["nodes"]
+            if node["type"] == "Trellis2MLXInputMaskQualityGate"
+        ),
+        key=lambda node: node["id"],
+    )
+    generator = next(
+        node for node in workflow["nodes"] if node["type"] == "Trellis2MLXMultiViewTo3D"
+    )
+    rmbg_nodes = [node for node in workflow["nodes"] if node["type"] == "RMBG"]
+
+    assert [node["title"] for node in gates] == [
+        "Mask Gate 000° — Front",
+        "Mask Gate 090° — Left",
+        "Mask Gate 180° — Rear",
+    ]
+    assert all(node["widgets_values"] == [0.5, 0.05, 0.85, 0.1, 0.02, "no"] for node in gates)
+    assert all(node["inputs"][7]["link"] is None for node in gates)
+    assert all(node["outputs"][0]["links"] for node in gates)
+    assert all(node["outputs"][1]["links"] for node in gates)
+    assert all(node["outputs"][1]["links"] is None for node in rmbg_nodes)
+    assert [generator["inputs"][index]["link"] for index in (1, 2, 3)] == [13, 14, 15]
+    assert generator["inputs"][4]["link"] is None
+    assert [generator["inputs"][index]["link"] for index in (9, 10, 11)] == [16, 17, 18]
+    assert generator["inputs"][12]["link"] is None
+
+
+def test_four_view_mask_gated_workflow_populates_right_camera_and_mask():
+    workflow_path = (
+        Path(__file__).parents[1]
+        / "comfyui_trellis2_mlx"
+        / "workflows"
+        / "trellis2_mlx_four_view_mask_gated.json"
+    )
+    workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
+    generator = next(
+        node for node in workflow["nodes"] if node["type"] == "Trellis2MLXMultiViewTo3D"
+    )
+    load_nodes = [node for node in workflow["nodes"] if node["type"] == "LoadImage"]
+    gates = [
+        node
+        for node in workflow["nodes"]
+        if node["type"] == "Trellis2MLXInputMaskQualityGate"
+    ]
+
+    assert {node["title"] for node in load_nodes} == {
+        "Load Camera 000° — Front",
+        "Load Camera 090° — Left",
+        "Load Camera 180° — Rear",
+        "Load Camera 270° — Right",
+    }
+    assert {node["title"] for node in gates} == {
+        "Mask Gate 000° — Front",
+        "Mask Gate 090° — Left",
+        "Mask Gate 180° — Rear",
+        "Mask Gate 270° — Right",
+    }
+    assert [generator["inputs"][index]["link"] for index in (1, 2, 3, 4)] == [
+        13,
+        14,
+        15,
+        21,
+    ]
+    assert [generator["inputs"][index]["link"] for index in (9, 10, 11, 12)] == [
+        16,
+        17,
+        18,
+        22,
+    ]
+    assert next(
+        node for node in workflow["nodes"] if node["type"] == "SaveGLB"
+    )["widgets_values"][0] == "CFP/TRELLIS2_MLX_FOUR_VIEW_MASK_GATED"
+
+
+def test_four_view_consistency_workflow_routes_all_views_through_set_gate():
+    workflow_path = (
+        Path(__file__).parents[1]
+        / "comfyui_trellis2_mlx"
+        / "workflows"
+        / "trellis2_mlx_four_view_consistency_gated.json"
+    )
+    workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
+    gate = next(
+        node
+        for node in workflow["nodes"]
+        if node["type"] == "Trellis2MLXModelSheetConsistencyGate"
+    )
+    generator = next(
+        node for node in workflow["nodes"] if node["type"] == "Trellis2MLXMultiViewTo3D"
+    )
+
+    assert gate["widgets_values"] == [0.08, 0.05, 0.05, 0.03, 0.15, "no"]
+    assert [node_input["link"] for node_input in gate["inputs"][:8]] == [
+        13,
+        14,
+        15,
+        21,
+        16,
+        17,
+        18,
+        22,
+    ]
+    assert [output["links"] for output in gate["outputs"][:8]] == [
+        [23],
+        [24],
+        [25],
+        [26],
+        [27],
+        [28],
+        [29],
+        [30],
+    ]
+    assert [generator["inputs"][index]["link"] for index in (1, 2, 3, 4)] == [
+        23,
+        24,
+        25,
+        26,
+    ]
+    assert [generator["inputs"][index]["link"] for index in (9, 10, 11, 12)] == [
+        27,
+        28,
+        29,
+        30,
+    ]
+
+
+def test_alignment_review_workflow_branches_without_mutating_generation_inputs():
+    workflow_path = (
+        Path(__file__).parents[1]
+        / "comfyui_trellis2_mlx"
+        / "workflows"
+        / "trellis2_mlx_four_view_alignment_review.json"
+    )
+    workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
+    review = next(
+        node
+        for node in workflow["nodes"]
+        if node["type"] == "Trellis2MLXModelSheetAlignmentReview"
+    )
+    consistency = next(
+        node
+        for node in workflow["nodes"]
+        if node["type"] == "Trellis2MLXModelSheetConsistencyGate"
+    )
+    preview = next(
+        node
+        for node in workflow["nodes"]
+        if node.get("title") == "Alignment Contact Sheet — Human Review"
+    )
+
+    assert review["widgets_values"] == [384]
+    assert [node_input["link"] for node_input in review["inputs"][:8]] == [
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+    ]
+    assert review["outputs"][0]["links"] == [39, 40]
+    assert preview["inputs"][0]["link"] == 39
+    assert [node_input["link"] for node_input in consistency["inputs"][:8]] == [
+        13,
+        14,
+        15,
+        21,
+        16,
+        17,
+        18,
+        22,
+    ]
+    assert next(
+        node
+        for node in workflow["nodes"]
+        if node.get("title") == "Save Alignment Review"
+    )["widgets_values"][0] == "CFP/TRELLIS2_MLX_ALIGNMENT_REVIEW"
+
+
+def test_alignment_candidate_workflow_keeps_candidate_disconnected_from_trellis():
+    workflow_path = (
+        Path(__file__).parents[1]
+        / "comfyui_trellis2_mlx"
+        / "workflows"
+        / "trellis2_mlx_four_view_alignment_candidate.json"
+    )
+    workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
+    candidate = next(
+        node
+        for node in workflow["nodes"]
+        if node["type"] == "Trellis2MLXModelSheetAlignmentCandidate"
+    )
+    generator = next(
+        node for node in workflow["nodes"] if node["type"] == "Trellis2MLXMultiViewTo3D"
+    )
+    after_review = next(
+        node
+        for node in workflow["nodes"]
+        if node.get("title") == "AFTER — Candidate Alignment Review"
+    )
+
+    assert candidate["widgets_values"] == ["median", 0.82, 250.0]
+    assert [node_input["link"] for node_input in candidate["inputs"][:8]] == [
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47,
+        48,
+    ]
+    assert [node_input["link"] for node_input in after_review["inputs"][:8]] == [
+        49,
+        50,
+        51,
+        52,
+        53,
+        54,
+        55,
+        56,
+    ]
+    assert [generator["inputs"][index]["link"] for index in (1, 2, 3, 4)] == [
+        23,
+        24,
+        25,
+        26,
+    ]
+    candidate_node_id = candidate["id"]
+    assert not any(
+        link[1] == candidate_node_id and link[3] == generator["id"]
+        for link in workflow["links"]
+    )
+    assert next(
+        node
+        for node in workflow["nodes"]
+        if node.get("title") == "Save AFTER Alignment Review"
+    )["widgets_values"][0] == "CFP/TRELLIS2_MLX_ALIGNMENT_CANDIDATE_REVIEW"
+
+
+def test_geometry_only_workflow_selects_geometry_mode_and_preserves_review_gate():
+    workflow_path = (
+        Path(__file__).parents[1]
+        / "comfyui_trellis2_mlx"
+        / "workflows"
+        / "trellis2_mlx_geometry_only.json"
+    )
+    workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
+    generator = next(
+        node for node in workflow["nodes"] if node["type"] == "Trellis2MLXImageTo3D"
+    )
+    input_names = [item["name"] for item in generator["inputs"]]
+    output_mode_index = input_names.index("output_mode")
+
+    assert generator["widgets_values"][3] == "geometry_only"
+    assert generator["title"] == "TRELLIS.2 MLX Geometry Only"
+    assert generator["inputs"][output_mode_index]["link"] is None
+    assert next(
+        node for node in workflow["nodes"] if node["type"] == "Trellis2MLXMeshReport"
+    )
+    assert next(
+        node for node in workflow["nodes"] if node["type"] == "SaveGLB"
+    )["widgets_values"][0] == "CFP/TRELLIS2_MLX_GEOMETRY_ONLY"
+
+    node_source = (
+        Path(__file__).parents[1] / "comfyui_trellis2_mlx" / "nodes.py"
+    ).read_text(encoding="utf-8")
+    assert "texture-free GLB with no UVs or atlas" in node_source
+
+
+def test_remove_floaters_workflow_has_before_after_review_gates():
+    workflow_path = (
+        Path(__file__).parents[1]
+        / "comfyui_trellis2_mlx"
+        / "workflows"
+        / "trellis2_mlx_remove_floaters.json"
+    )
+    workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
+    cleanup = next(
+        node for node in workflow["nodes"] if node["type"] == "Trellis2MLXRemoveFloaters"
+    )
+    reports = [
+        node for node in workflow["nodes"] if node["type"] == "Trellis2MLXMeshReport"
+    ]
+
+    assert cleanup["widgets_values"] == [100, 0.001]
+    assert cleanup["outputs"][0]["links"] == [6, 7, 8]
+    assert {node["title"] for node in reports} == {
+        "BEFORE — Raw Geometry Report",
+        "AFTER — Cleaned Geometry Report",
+    }
+    assert next(
+        node for node in workflow["nodes"] if node["type"] == "SaveGLB"
+    )["widgets_values"][0] == "CFP/TRELLIS2_MLX_FLOATERS_REMOVED"
+
+
+def test_topology_diagnostics_workflow_analyzes_cleaned_geometry():
+    workflow_path = (
+        Path(__file__).parents[1]
+        / "comfyui_trellis2_mlx"
+        / "workflows"
+        / "trellis2_mlx_topology_diagnostics.json"
+    )
+    workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
+    cleanup = next(
+        node for node in workflow["nodes"] if node["type"] == "Trellis2MLXRemoveFloaters"
+    )
+    diagnostics = next(
+        node
+        for node in workflow["nodes"]
+        if node["type"] == "Trellis2MLXTopologyDiagnostics"
+    )
+    diagnostic_link = next(link for link in workflow["links"] if link[0] == 9)
+
+    assert cleanup["outputs"][0]["links"] == [6, 7, 8, 9]
+    assert diagnostics["widgets_values"] == [0.000001]
+    assert diagnostic_link[1:5] == [4, 0, 9, 0]
+
+
+def test_topology_sanitizer_workflow_has_before_after_diagnostics():
+    workflow_path = (
+        Path(__file__).parents[1]
+        / "comfyui_trellis2_mlx"
+        / "workflows"
+        / "trellis2_mlx_topology_sanitizer.json"
+    )
+    workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
+    sanitizer = next(
+        node
+        for node in workflow["nodes"]
+        if node["type"] == "Trellis2MLXTopologySanitizer"
+    )
+    diagnostics = [
+        node
+        for node in workflow["nodes"]
+        if node["type"] == "Trellis2MLXTopologyDiagnostics"
+    ]
+
+    assert sanitizer["widgets_values"] == [1e-8]
+    assert sanitizer["outputs"][0]["links"] == [8, 9, 10, 11]
+    assert {node["title"] for node in diagnostics} == {
+        "BEFORE SANITIZER — O-Voxel Diagnostics",
+        "AFTER SANITIZER — O-Voxel Diagnostics",
+    }
+    assert all(node["widgets_values"] == [1e-8] for node in diagnostics)
+    assert next(
+        node for node in workflow["nodes"] if node["type"] == "SaveGLB"
+    )["widgets_values"][0] == "CFP/TRELLIS2_MLX_TOPOLOGY_SANITIZED"
+
+
+def test_voxel_remesh_workflow_preserves_source_and_reviews_candidate():
+    workflow_path = (
+        Path(__file__).parents[1]
+        / "comfyui_trellis2_mlx"
+        / "workflows"
+        / "trellis2_mlx_voxel_remesh_candidate.json"
+    )
+    workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
+    remesh = next(
+        node
+        for node in workflow["nodes"]
+        if node["type"] == "Trellis2MLXVoxelRemeshCandidate"
+    )
+    previews = [node for node in workflow["nodes"] if node["type"] == "Preview3D"]
+    diagnostics = [
+        node
+        for node in workflow["nodes"]
+        if node["type"] == "Trellis2MLXTopologyDiagnostics"
+    ]
+
+    assert remesh["widgets_values"] == [192]
+    assert remesh["outputs"][0]["links"] == [13, 14, 15, 16]
+    assert {node["title"] for node in previews} == {
+        "SOURCE — Sanitized Geometry",
+        "CANDIDATE — Watertight Voxel Remesh",
+    }
+    assert {node["title"] for node in diagnostics} >= {
+        "BEFORE VOXEL — Sanitized Diagnostics",
+        "AFTER VOXEL — Candidate Diagnostics",
+    }
+    assert next(
+        node for node in workflow["nodes"] if node["type"] == "SaveGLB"
+    )["widgets_values"][0] == "CFP/TRELLIS2_MLX_VOXEL_REMESH_CANDIDATE"
+
+
+def test_voxel_resolution_ab_workflow_fans_out_and_requires_human_review():
+    workflow_path = (
+        Path(__file__).parents[1]
+        / "comfyui_trellis2_mlx"
+        / "workflows"
+        / "trellis2_mlx_voxel_resolution_ab.json"
+    )
+    workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
+    remesh_nodes = [
+        node
+        for node in workflow["nodes"]
+        if node["type"] == "Trellis2MLXVoxelRemeshCandidate"
+    ]
+    previews = [
+        node["title"]
+        for node in workflow["nodes"]
+        if node["type"] == "Preview3D" and "Candidate Preview" in node.get("title", "")
+    ]
+    save_prefixes = [
+        node["widgets_values"][0]
+        for node in workflow["nodes"]
+        if node["type"] == "SaveGLB"
+    ]
+    comparison = next(
+        node
+        for node in workflow["nodes"]
+        if node["type"] == "Trellis2MLXVoxelCandidateComparison"
+    )
+
+    assert sorted(node["widgets_values"][0] for node in remesh_nodes) == [
+        128,
+        192,
+        256,
+    ]
+    assert set(previews) == {
+        "128 — Candidate Preview",
+        "192 — Candidate Preview",
+        "256 — Candidate Preview",
+    }
+    assert set(save_prefixes) == {
+        "CFP/TRELLIS2_MLX_VOXEL_128",
+        "CFP/TRELLIS2_MLX_VOXEL_192",
+        "CFP/TRELLIS2_MLX_VOXEL_256",
+    }
+    assert [node_input["link"] for node_input in comparison["inputs"]] == [
+        23,
+        24,
+        25,
+    ]
+    assert comparison["title"] == "128 / 192 / 256 — Human Review Comparison"
+
+
+def test_post_voxel_polish_workflow_preserves_raw_and_saves_polished_candidate():
+    workflow_path = (
+        Path(__file__).parents[1]
+        / "comfyui_trellis2_mlx"
+        / "workflows"
+        / "trellis2_mlx_post_voxel_polish.json"
+    )
+    workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
+    remesh = next(
+        node
+        for node in workflow["nodes"]
+        if node["type"] == "Trellis2MLXVoxelRemeshCandidate"
+    )
+    polish = next(
+        node
+        for node in workflow["nodes"]
+        if node["type"] == "Trellis2MLXPostVoxelTopologyPolish"
+    )
+    previews = {
+        node["title"]
+        for node in workflow["nodes"]
+        if node["type"] == "Preview3D"
+    }
+    diagnostics = {
+        node["title"]
+        for node in workflow["nodes"]
+        if node["type"] == "Trellis2MLXTopologyDiagnostics"
+    }
+    save = next(node for node in workflow["nodes"] if node["type"] == "SaveGLB")
+
+    assert remesh["widgets_values"] == [256]
+    assert remesh["outputs"][0]["links"] == [13, 16, 17]
+    assert polish["inputs"][0]["link"] == 17
+    assert polish["outputs"][0]["links"] == [14, 15, 18, 19]
+    assert {
+        "RAW 256 — Before Polish",
+        "POLISHED 256 — After Conservative Repair",
+    } <= previews
+    assert {
+        "RAW 256 — Diagnostics",
+        "POLISHED 256 — Diagnostics",
+    } <= diagnostics
+    assert save["widgets_values"][0] == "CFP/TRELLIS2_MLX_VOXEL_256_POLISHED"
+
+
+def test_print_scale_workflow_uses_polished_256_and_saves_250mm_candidate():
+    workflow_path = (
+        Path(__file__).parents[1]
+        / "comfyui_trellis2_mlx"
+        / "workflows"
+        / "trellis2_mlx_print_scale_gate.json"
+    )
+    workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
+    polish = next(
+        node
+        for node in workflow["nodes"]
+        if node["type"] == "Trellis2MLXPostVoxelTopologyPolish"
+    )
+    scale = next(
+        node
+        for node in workflow["nodes"]
+        if node["type"] == "Trellis2MLXPrintScaleFeatureGate"
+    )
+    save = next(node for node in workflow["nodes"] if node["type"] == "SaveGLB")
+
+    assert polish["outputs"][0]["links"] == [20]
+    assert scale["inputs"][0]["link"] == 20
+    assert scale["widgets_values"] == [250.0, "z", 256, 0.4, 0.2]
+    assert scale["outputs"][0]["links"] == [14, 15, 18, 19]
+    assert save["widgets_values"][0] == "CFP/TRELLIS2_MLX_PRINT_250MM"
+    assert next(
+        node
+        for node in workflow["nodes"]
+        if node.get("title") == "SCALED 250 mm — Print Preview"
+    )
+
+
+def test_background_guard_workflow_blocks_before_voxel_by_default():
+    workflow_path = (
+        Path(__file__).parents[1]
+        / "comfyui_trellis2_mlx"
+        / "workflows"
+        / "trellis2_mlx_background_geometry_guard.json"
+    )
+    workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
+    sanitizer = next(
+        node
+        for node in workflow["nodes"]
+        if node["type"] == "Trellis2MLXTopologySanitizer"
+    )
+    guard = next(
+        node
+        for node in workflow["nodes"]
+        if node["type"] == "Trellis2MLXBackgroundGeometryGuard"
+    )
+    remesh = next(
+        node
+        for node in workflow["nodes"]
+        if node["type"] == "Trellis2MLXVoxelRemeshCandidate"
+    )
+
+    assert sanitizer["outputs"][0]["links"] == [8, 11, 21]
+    assert guard["inputs"][0]["link"] == 21
+    assert guard["widgets_values"] == [
+        "character_z_up",
+        1.25,
+        0.02,
+        0.4,
+        "no",
+    ]
+    assert guard["outputs"][0]["links"] == [12]
+    assert remesh["inputs"][0]["link"] == 12
 
 
 def test_build_environment_preserves_parent_and_sets_proven_contract(tmp_path):
@@ -171,6 +771,7 @@ def test_build_environment_preserves_parent_and_sets_proven_contract(tmp_path):
     assert environment["SEED"] == "42"
     assert environment["STEPS"] == "12"
     assert environment["MATTING"] == "off"
+    assert environment["TEXTURE"] == "on"
     assert environment["ENGINE_MEMORY_FRACTION"] == "0.95"
     assert "ADDITIONAL_VIEWS_MANIFEST" not in environment
 
@@ -197,6 +798,41 @@ def test_build_environment_passes_ordered_additional_views_manifest(tmp_path):
 
     assert environment["IMG"].endswith("000.png")
     assert environment["ADDITIONAL_VIEWS_MANIFEST"] == str(manifest)
+
+
+def test_build_environment_disables_texture_for_geometry_only(tmp_path):
+    config = Trellis2MLXConfig(Path("/engine"), Path("/weights"), 0.95)
+
+    environment = build_environment(
+        {},
+        config=config,
+        image_path=tmp_path / "input.png",
+        output_path=tmp_path / "output.glb",
+        metrics_path=tmp_path / "metrics.json",
+        seed=0,
+        steps=12,
+        use_matting=False,
+        output_mode="geometry_only",
+    )
+
+    assert environment["TEXTURE"] == "off"
+
+
+def test_build_environment_rejects_unknown_output_mode(tmp_path):
+    config = Trellis2MLXConfig(Path("/engine"), Path("/weights"), 0.95)
+
+    with pytest.raises(ValueError, match="output_mode"):
+        build_environment(
+            {},
+            config=config,
+            image_path=tmp_path / "input.png",
+            output_path=tmp_path / "output.glb",
+            metrics_path=tmp_path / "metrics.json",
+            seed=0,
+            steps=12,
+            use_matting=False,
+            output_mode="surprise",
+        )
 
 
 @pytest.mark.parametrize("seed", [-1, 2**64])

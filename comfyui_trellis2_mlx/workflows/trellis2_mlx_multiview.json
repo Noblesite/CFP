@@ -207,6 +207,7 @@
         {"localized_name": "image_270", "name": "image_270", "shape": 7, "type": "IMAGE", "link": null},
         {"localized_name": "seed", "name": "seed", "type": "INT", "widget": {"name": "seed"}, "link": null},
         {"localized_name": "steps", "name": "steps", "type": "INT", "widget": {"name": "steps"}, "link": null},
+        {"localized_name": "output_mode", "name": "output_mode", "type": "COMBO", "widget": {"name": "output_mode"}, "link": null},
         {"localized_name": "matting", "name": "matting", "type": "COMBO", "widget": {"name": "matting"}, "link": null},
         {"localized_name": "mask_000", "name": "mask_000", "shape": 7, "type": "MASK", "link": null},
         {"localized_name": "mask_090", "name": "mask_090", "shape": 7, "type": "MASK", "link": null},
@@ -221,7 +222,7 @@
         {"localized_name": "artifact_sha256", "name": "artifact_sha256", "type": "STRING", "slot_index": 4, "links": null}
       ],
       "properties": {"Node name for S&R": "Trellis2MLXMultiViewTo3D"},
-      "widgets_values": [0, "fixed", 12, "off"]
+      "widgets_values": [0, "fixed", 12, "textured", "off"]
     },
     {
       "id": 10,

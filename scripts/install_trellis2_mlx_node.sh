@@ -83,6 +83,36 @@ cp "$node_source/workflows/trellis2_mlx_background_clean.json" \
     "$workflow_dir/CFP_TRELLIS2_MLX_Background_Clean_v001.json"
 cp "$node_source/workflows/trellis2_mlx_multiview.json" \
     "$workflow_dir/CFP_TRELLIS2_MLX_MultiView_v001.json"
+cp "$node_source/workflows/trellis2_mlx_geometry_only.json" \
+    "$workflow_dir/CFP_TRELLIS2_MLX_Geometry_Only_v001.json"
+cp "$node_source/workflows/trellis2_mlx_remove_floaters.json" \
+    "$workflow_dir/CFP_TRELLIS2_MLX_Remove_Floaters_v001.json"
+cp "$node_source/workflows/trellis2_mlx_topology_diagnostics.json" \
+    "$workflow_dir/CFP_TRELLIS2_MLX_Topology_Diagnostics_v001.json"
+cp "$node_source/workflows/trellis2_mlx_topology_sanitizer.json" \
+    "$workflow_dir/CFP_TRELLIS2_MLX_Topology_Sanitizer_v001.json"
+cp "$node_source/workflows/trellis2_mlx_voxel_remesh_candidate.json" \
+    "$workflow_dir/CFP_TRELLIS2_MLX_Voxel_Remesh_Candidate_v001.json"
+cp "$node_source/workflows/trellis2_mlx_voxel_resolution_ab.json" \
+    "$workflow_dir/CFP_TRELLIS2_MLX_Voxel_Resolution_AB_v001.json"
+cp "$node_source/workflows/trellis2_mlx_post_voxel_polish.json" \
+    "$workflow_dir/CFP_TRELLIS2_MLX_Post_Voxel_Polish_v001.json"
+cp "$node_source/workflows/trellis2_mlx_print_scale_gate.json" \
+    "$workflow_dir/CFP_TRELLIS2_MLX_Print_Scale_Gate_v001.json"
+cp "$node_source/workflows/trellis2_mlx_background_geometry_guard.json" \
+    "$workflow_dir/CFP_TRELLIS2_MLX_Background_Geometry_Guard_v001.json"
+cp "$node_source/workflows/trellis2_mlx_input_mask_quality_gate.json" \
+    "$workflow_dir/CFP_TRELLIS2_MLX_Input_Mask_Quality_Gate_v001.json"
+cp "$node_source/workflows/trellis2_mlx_multiview_mask_gated.json" \
+    "$workflow_dir/CFP_TRELLIS2_MLX_MultiView_Mask_Gated_v001.json"
+cp "$node_source/workflows/trellis2_mlx_four_view_mask_gated.json" \
+    "$workflow_dir/CFP_TRELLIS2_MLX_Four_View_Mask_Gated_v001.json"
+cp "$node_source/workflows/trellis2_mlx_four_view_consistency_gated.json" \
+    "$workflow_dir/CFP_TRELLIS2_MLX_Four_View_Consistency_Gated_v001.json"
+cp "$node_source/workflows/trellis2_mlx_four_view_alignment_review.json" \
+    "$workflow_dir/CFP_TRELLIS2_MLX_Four_View_Alignment_Review_v001.json"
+cp "$node_source/workflows/trellis2_mlx_four_view_alignment_candidate.json" \
+    "$workflow_dir/CFP_TRELLIS2_MLX_Four_View_Alignment_Candidate_v001.json"
 
 echo "TRELLIS.2 MLX node and workflows installed."
 echo "Restart ComfyUI, then open Workflows -> CFP."

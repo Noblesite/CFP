@@ -1,9 +1,14 @@
 [project]
 name = "comfyui-trellis2-mlx"
-version = "0.3.0"
+version = "0.15.0"
 description = "Native Swift/MLX TRELLIS.2 image-to-3D nodes for ComfyUI on Apple Silicon"
 requires-python = ">=3.12"
-dependencies = ["numpy>=2.0", "trimesh>=4.0"]
+dependencies = [
+    "numpy>=2.0",
+    "scikit-image>=0.25",
+    "scipy>=1.15",
+    "trimesh>=4.0",
+]
 
 [project.urls]
 Repository = "https://github.com/Noblesite/CFP"

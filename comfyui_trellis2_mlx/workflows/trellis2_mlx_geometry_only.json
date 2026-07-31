@@ -1,13 +1,13 @@
 {
-  "id": "cfp-trellis2-mlx-background-clean-v001",
+  "id": "cfp-trellis2-mlx-geometry-only-v001",
   "revision": 0,
-  "last_node_id": 8,
+  "last_node_id": 6,
   "last_link_id": 6,
   "nodes": [
     {
       "id": 1,
       "type": "LoadImage",
-      "pos": [-920, 80],
+      "pos": [-760, 80],
       "size": [315, 314],
       "flags": {},
       "order": 0,
@@ -17,84 +17,19 @@
         {"localized_name": "choose file to upload", "name": "upload", "type": "IMAGEUPLOAD", "widget": {"name": "upload"}, "link": null}
       ],
       "outputs": [
-        {"localized_name": "IMAGE", "name": "IMAGE", "type": "IMAGE", "slot_index": 0, "links": [1]},
-        {"localized_name": "MASK", "name": "MASK", "type": "MASK", "slot_index": 1, "links": null}
+        {"localized_name": "IMAGE", "name": "IMAGE", "type": "IMAGE", "slot_index": 0, "links": [2]},
+        {"localized_name": "MASK", "name": "MASK", "type": "MASK", "slot_index": 1, "links": [3]}
       ],
       "properties": {"cnr_id": "comfy-core", "ver": "0.5.1", "Node name for S&R": "LoadImage"},
       "widgets_values": ["", "image"]
     },
     {
-      "id": 6,
-      "type": "RMBG",
-      "pos": [-470, 80],
-      "size": [340, 292],
-      "flags": {},
-      "order": 1,
-      "mode": 0,
-      "inputs": [
-        {"name": "image", "type": "IMAGE", "link": 1}
-      ],
-      "outputs": [
-        {"name": "IMAGE", "type": "IMAGE", "slot_index": 0, "links": [3]},
-        {"name": "MASK", "type": "MASK", "slot_index": 1, "links": null},
-        {"name": "MASK_IMAGE", "type": "IMAGE", "slot_index": 2, "links": null}
-      ],
-      "properties": {
-        "cnr_id": "comfyui-rmbg",
-        "ver": "112fd6141d07663d5e4a35d66d269542b58f4438",
-        "Node name for S&R": "RMBG",
-        "models": [
-          {
-            "name": "BiRefNet_config.py",
-            "url": "https://huggingface.co/briaai/RMBG-2.0/resolve/main/BiRefNet_config.py",
-            "directory": "RMBG/RMBG-2.0"
-          },
-          {
-            "name": "birefnet.py",
-            "url": "https://huggingface.co/briaai/RMBG-2.0/resolve/main/birefnet.py",
-            "directory": "RMBG/RMBG-2.0"
-          },
-          {
-            "name": "config.json",
-            "url": "https://huggingface.co/briaai/RMBG-2.0/resolve/main/config.json",
-            "directory": "RMBG/RMBG-2.0"
-          },
-          {
-            "name": "model.safetensors",
-            "url": "https://huggingface.co/briaai/RMBG-2.0/resolve/main/model.safetensors",
-            "directory": "RMBG/RMBG-2.0"
-          }
-        ]
-      },
-      "widgets_values": ["RMBG-2.0", 1, 1024, 0, 0, false, false, "Alpha", "#222222"],
-      "color": "#222e40",
-      "bgcolor": "#364254"
-    },
-    {
-      "id": 7,
-      "type": "MarkdownNote",
-      "pos": [-920, -260],
-      "size": [790, 240],
-      "flags": {},
-      "order": 0,
-      "mode": 0,
-      "inputs": [],
-      "outputs": [],
-      "properties": {},
-      "widgets_values": [
-        "# RMBG-2.0 dependency\n\nThis workflow removes the background before reconstruction so TRELLIS.2 does not turn the backdrop into geometry.\n\n1. Accept BRIA's gated non-commercial access terms and download the four required files from [briaai/RMBG-2.0](https://huggingface.co/briaai/RMBG-2.0).\n2. Place `BiRefNet_config.py`, `birefnet.py`, `config.json`, and `model.safetensors` in `ComfyUI/models/RMBG/RMBG-2.0/`.\n3. Restart ComfyUI after installing the files.\n\nThe workflow also embeds official download metadata on the RMBG node. ComfyUI may still require browser authentication because the repository is gated. CFP does not bundle or mirror these weights. Commercial use requires a separate agreement with BRIA."
-      ],
-      "color": "#493b1f",
-      "bgcolor": "#6a5730",
-      "title": "RMBG-2.0 — Download, Purpose, and License"
-    },
-    {
       "id": 2,
       "type": "Trellis2MLXModel",
-      "pos": [-920, 500],
+      "pos": [-760, 500],
       "size": [430, 150],
       "flags": {},
-      "order": 2,
+      "order": 1,
       "mode": 0,
       "inputs": [
         {"localized_name": "engine_binary", "name": "engine_binary", "type": "STRING", "widget": {"name": "engine_binary"}, "link": null},
@@ -102,7 +37,7 @@
         {"localized_name": "memory_fraction", "name": "memory_fraction", "type": "FLOAT", "widget": {"name": "memory_fraction"}, "link": null}
       ],
       "outputs": [
-        {"localized_name": "mlx_config", "name": "mlx_config", "type": "TRELLIS2_MLX_CONFIG", "links": [2]}
+        {"localized_name": "mlx_config", "name": "mlx_config", "type": "TRELLIS2_MLX_CONFIG", "links": [1]}
       ],
       "properties": {"Node name for S&R": "Trellis2MLXModel"},
       "widgets_values": [
@@ -114,19 +49,20 @@
     {
       "id": 3,
       "type": "Trellis2MLXImageTo3D",
-      "pos": [80, 190],
-      "size": [390, 250],
+      "title": "TRELLIS.2 MLX Geometry Only",
+      "pos": [-160, 190],
+      "size": [390, 230],
       "flags": {},
-      "order": 3,
+      "order": 2,
       "mode": 0,
       "inputs": [
-        {"localized_name": "mlx_config", "name": "mlx_config", "type": "TRELLIS2_MLX_CONFIG", "link": 2},
-        {"localized_name": "image", "name": "image", "type": "IMAGE", "link": 3},
+        {"localized_name": "mlx_config", "name": "mlx_config", "type": "TRELLIS2_MLX_CONFIG", "link": 1},
+        {"localized_name": "image", "name": "image", "type": "IMAGE", "link": 2},
         {"localized_name": "seed", "name": "seed", "type": "INT", "widget": {"name": "seed"}, "link": null},
         {"localized_name": "steps", "name": "steps", "type": "INT", "widget": {"name": "steps"}, "link": null},
         {"localized_name": "output_mode", "name": "output_mode", "type": "COMBO", "widget": {"name": "output_mode"}, "link": null},
         {"localized_name": "matting", "name": "matting", "type": "COMBO", "widget": {"name": "matting"}, "link": null},
-        {"localized_name": "mask", "name": "mask", "shape": 7, "type": "MASK", "link": null}
+        {"localized_name": "mask", "name": "mask", "shape": 7, "type": "MASK", "link": 3}
       ],
       "outputs": [
         {"localized_name": "model_3d", "name": "model_3d", "type": "FILE_3D_GLB", "slot_index": 0, "links": [4, 5, 6]},
@@ -136,15 +72,15 @@
         {"localized_name": "artifact_sha256", "name": "artifact_sha256", "type": "STRING", "slot_index": 4, "links": null}
       ],
       "properties": {"Node name for S&R": "Trellis2MLXImageTo3D"},
-      "widgets_values": [0, "fixed", 12, "textured", "off"]
+      "widgets_values": [0, "fixed", 12, "geometry_only", "off"]
     },
     {
       "id": 4,
       "type": "Preview3D",
-      "pos": [680, -80],
+      "pos": [430, -80],
       "size": [520, 620],
       "flags": {},
-      "order": 4,
+      "order": 3,
       "mode": 0,
       "inputs": [
         {"localized_name": "camera_info", "name": "camera_info", "shape": 7, "type": "LOAD3D_CAMERA", "link": null},
@@ -165,10 +101,10 @@
     {
       "id": 5,
       "type": "SaveGLB",
-      "pos": [1280, 160],
+      "pos": [1030, 160],
       "size": [420, 280],
       "flags": {},
-      "order": 5,
+      "order": 4,
       "mode": 0,
       "inputs": [
         {"localized_name": "mesh", "name": "mesh", "type": "MESH,FILE_3D_GLB,FILE_3D_GLTF,FILE_3D_OBJ,FILE_3D_FBX,FILE_3D_STL,FILE_3D_USDZ,FILE_3D_PLY,FILE_3D_SPLAT,FILE_3D_SPZ,FILE_3D_KSPLAT,FILE_3D_SPLAT_ANY,FILE_3D_POINT_CLOUD_ANY,FILE_3D", "link": 5},
@@ -177,15 +113,15 @@
       ],
       "outputs": [],
       "properties": {"cnr_id": "comfy-core", "ver": "0.5.1", "Node name for S&R": "SaveGLB"},
-      "widgets_values": ["CFP/TRELLIS2_MLX_BG_CLEAN", ""]
+      "widgets_values": ["CFP/TRELLIS2_MLX_GEOMETRY_ONLY", ""]
     },
     {
-      "id": 8,
+      "id": 6,
       "type": "Trellis2MLXMeshReport",
-      "pos": [1280, 510],
+      "pos": [1030, 510],
       "size": [470, 360],
       "flags": {},
-      "order": 6,
+      "order": 5,
       "mode": 0,
       "inputs": [
         {"localized_name": "model_3d", "name": "model_3d", "type": "FILE_3D_GLB", "link": 6}
@@ -200,22 +136,22 @@
     }
   ],
   "links": [
-    [1, 1, 0, 6, 0, "IMAGE"],
-    [2, 2, 0, 3, 0, "TRELLIS2_MLX_CONFIG"],
-    [3, 6, 0, 3, 1, "IMAGE"],
+    [1, 2, 0, 3, 0, "TRELLIS2_MLX_CONFIG"],
+    [2, 1, 0, 3, 1, "IMAGE"],
+    [3, 1, 1, 3, 6, "MASK"],
     [4, 3, 0, 4, 2, "FILE_3D_GLB"],
     [5, 3, 0, 5, 0, "FILE_3D_GLB"],
-    [6, 3, 0, 8, 0, "FILE_3D_GLB"]
+    [6, 3, 0, 6, 0, "FILE_3D_GLB"]
   ],
   "groups": [
-    {"id": 1, "title": "01 — INPUT AND BACKGROUND REMOVAL", "bounding": [-960, -310, 880, 730], "color": "#3f789e", "font_size": 24, "flags": {}},
-    {"id": 2, "title": "02 — NATIVE MLX CONFIGURATION", "bounding": [-960, 450, 510, 250], "color": "#8a6f42", "font_size": 24, "flags": {}},
-    {"id": 3, "title": "03 — TRELLIS.2 MLX RECONSTRUCTION", "bounding": [30, 130, 490, 360], "color": "#6b4b8a", "font_size": 24, "flags": {}},
-    {"id": 4, "title": "04 — REVIEW, REPORT, AND SAVE", "bounding": [630, -130, 1160, 1050], "color": "#4d8061", "font_size": 24, "flags": {}}
+    {"id": 1, "title": "01 — IMAGE INPUT", "bounding": [-800, 20, 400, 400], "color": "#3f789e", "font_size": 24, "flags": {}},
+    {"id": 2, "title": "02 — NATIVE MLX CONFIGURATION", "bounding": [-800, 450, 510, 250], "color": "#8a6f42", "font_size": 24, "flags": {}},
+    {"id": 3, "title": "03 — GEOMETRY-ONLY RECONSTRUCTION", "bounding": [-210, 130, 490, 340], "color": "#6b4b8a", "font_size": 24, "flags": {}},
+    {"id": 4, "title": "04 — REVIEW, REPORT, AND SAVE", "bounding": [380, -130, 1160, 1050], "color": "#4d8061", "font_size": 24, "flags": {}}
   ],
   "config": {},
   "extra": {
-    "ds": {"scale": 0.78, "offset": [780, 300]},
+    "ds": {"scale": 0.82, "offset": [820, 300]},
     "frontendVersion": "1.30.6",
     "workflowRendererVersion": "LG"
   },

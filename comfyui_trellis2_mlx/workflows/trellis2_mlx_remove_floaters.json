@@ -1,8 +1,8 @@
 {
-  "id": "cfp-trellis2-mlx-image-to-3d-v001",
+  "id": "cfp-trellis2-mlx-remove-floaters-v001",
   "revision": 0,
-  "last_node_id": 6,
-  "last_link_id": 6,
+  "last_node_id": 8,
+  "last_link_id": 8,
   "nodes": [
     {
       "id": 1,
@@ -49,6 +49,7 @@
     {
       "id": 3,
       "type": "Trellis2MLXImageTo3D",
+      "title": "TRELLIS.2 MLX Geometry Only",
       "pos": [-160, 190],
       "size": [390, 230],
       "flags": {},
@@ -64,27 +65,49 @@
         {"localized_name": "mask", "name": "mask", "shape": 7, "type": "MASK", "link": 3}
       ],
       "outputs": [
-        {"localized_name": "model_3d", "name": "model_3d", "type": "FILE_3D_GLB", "slot_index": 0, "links": [4, 5, 6]},
+        {"localized_name": "model_3d", "name": "model_3d", "type": "FILE_3D_GLB", "slot_index": 0, "links": [4, 5]},
         {"localized_name": "artifact_path", "name": "artifact_path", "type": "STRING", "slot_index": 1, "links": null},
         {"localized_name": "metrics_json", "name": "metrics_json", "type": "STRING", "slot_index": 2, "links": null},
         {"localized_name": "engine_log", "name": "engine_log", "type": "STRING", "slot_index": 3, "links": null},
         {"localized_name": "artifact_sha256", "name": "artifact_sha256", "type": "STRING", "slot_index": 4, "links": null}
       ],
       "properties": {"Node name for S&R": "Trellis2MLXImageTo3D"},
-      "widgets_values": [0, "fixed", 12, "textured", "off"]
+      "widgets_values": [0, "fixed", 12, "geometry_only", "off"]
     },
     {
       "id": 4,
-      "type": "Preview3D",
-      "pos": [430, -80],
-      "size": [520, 620],
+      "type": "Trellis2MLXRemoveFloaters",
+      "pos": [420, 150],
+      "size": [440, 230],
       "flags": {},
       "order": 3,
       "mode": 0,
       "inputs": [
+        {"localized_name": "model_3d", "name": "model_3d", "type": "FILE_3D_GLB", "link": 4},
+        {"localized_name": "min_component_faces", "name": "min_component_faces", "type": "INT", "widget": {"name": "min_component_faces"}, "link": null},
+        {"localized_name": "min_component_ratio", "name": "min_component_ratio", "type": "FLOAT", "widget": {"name": "min_component_ratio"}, "link": null}
+      ],
+      "outputs": [
+        {"localized_name": "model_3d", "name": "model_3d", "type": "FILE_3D_GLB", "slot_index": 0, "links": [6, 7, 8]},
+        {"localized_name": "cleanup_report", "name": "cleanup_report", "type": "STRING", "slot_index": 1, "links": null},
+        {"localized_name": "cleanup_report_json", "name": "cleanup_report_json", "type": "STRING", "slot_index": 2, "links": null},
+        {"localized_name": "status", "name": "status", "type": "STRING", "slot_index": 3, "links": null}
+      ],
+      "properties": {"Node name for S&R": "Trellis2MLXRemoveFloaters"},
+      "widgets_values": [100, 0.001]
+    },
+    {
+      "id": 5,
+      "type": "Preview3D",
+      "pos": [1040, -80],
+      "size": [520, 620],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
         {"localized_name": "camera_info", "name": "camera_info", "shape": 7, "type": "LOAD3D_CAMERA", "link": null},
         {"localized_name": "bg_image", "name": "bg_image", "shape": 7, "type": "IMAGE", "link": null},
-        {"localized_name": "model_file", "name": "model_file", "type": "STRING,FILE_3D_GLB,FILE_3D_GLTF,FILE_3D_FBX,FILE_3D_OBJ,FILE_3D_STL,FILE_3D_USDZ,FILE_3D", "widget": {"name": "model_file"}, "link": 4},
+        {"localized_name": "model_file", "name": "model_file", "type": "STRING,FILE_3D_GLB,FILE_3D_GLTF,FILE_3D_FBX,FILE_3D_OBJ,FILE_3D_STL,FILE_3D_USDZ,FILE_3D", "widget": {"name": "model_file"}, "link": 6},
         {"localized_name": "image", "name": "image", "type": "PREVIEW_3D", "widget": {"name": "image"}, "link": null}
       ],
       "outputs": [],
@@ -98,32 +121,53 @@
       "widgets_values": ["", ""]
     },
     {
-      "id": 5,
-      "type": "SaveGLB",
-      "pos": [1030, 160],
-      "size": [420, 280],
-      "flags": {},
-      "order": 4,
-      "mode": 0,
-      "inputs": [
-        {"localized_name": "mesh", "name": "mesh", "type": "MESH,FILE_3D_GLB,FILE_3D_GLTF,FILE_3D_OBJ,FILE_3D_FBX,FILE_3D_STL,FILE_3D_USDZ,FILE_3D_PLY,FILE_3D_SPLAT,FILE_3D_SPZ,FILE_3D_KSPLAT,FILE_3D_SPLAT_ANY,FILE_3D_POINT_CLOUD_ANY,FILE_3D", "link": 5},
-        {"localized_name": "filename_prefix", "name": "filename_prefix", "type": "STRING", "widget": {"name": "filename_prefix"}, "link": null},
-        {"localized_name": "image", "name": "image", "type": "PREVIEW_3D", "widget": {"name": "image"}, "link": null}
-      ],
-      "outputs": [],
-      "properties": {"cnr_id": "comfy-core", "ver": "0.5.1", "Node name for S&R": "SaveGLB"},
-      "widgets_values": ["CFP/TRELLIS2_MLX", ""]
-    },
-    {
       "id": 6,
       "type": "Trellis2MLXMeshReport",
-      "pos": [1030, 510],
+      "title": "BEFORE — Raw Geometry Report",
+      "pos": [420, 470],
       "size": [470, 360],
       "flags": {},
       "order": 5,
       "mode": 0,
       "inputs": [
-        {"localized_name": "model_3d", "name": "model_3d", "type": "FILE_3D_GLB", "link": 6}
+        {"localized_name": "model_3d", "name": "model_3d", "type": "FILE_3D_GLB", "link": 5}
+      ],
+      "outputs": [
+        {"localized_name": "report", "name": "report", "type": "STRING", "slot_index": 0, "links": null},
+        {"localized_name": "report_json", "name": "report_json", "type": "STRING", "slot_index": 1, "links": null},
+        {"localized_name": "status", "name": "status", "type": "STRING", "slot_index": 2, "links": null}
+      ],
+      "properties": {"Node name for S&R": "Trellis2MLXMeshReport"},
+      "widgets_values": []
+    },
+    {
+      "id": 7,
+      "type": "SaveGLB",
+      "pos": [1620, 120],
+      "size": [420, 280],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {"localized_name": "mesh", "name": "mesh", "type": "MESH,FILE_3D_GLB,FILE_3D_GLTF,FILE_3D_OBJ,FILE_3D_FBX,FILE_3D_STL,FILE_3D_USDZ,FILE_3D_PLY,FILE_3D_SPLAT,FILE_3D_SPZ,FILE_3D_KSPLAT,FILE_3D_SPLAT_ANY,FILE_3D_POINT_CLOUD_ANY,FILE_3D", "link": 7},
+        {"localized_name": "filename_prefix", "name": "filename_prefix", "type": "STRING", "widget": {"name": "filename_prefix"}, "link": null},
+        {"localized_name": "image", "name": "image", "type": "PREVIEW_3D", "widget": {"name": "image"}, "link": null}
+      ],
+      "outputs": [],
+      "properties": {"cnr_id": "comfy-core", "ver": "0.5.1", "Node name for S&R": "SaveGLB"},
+      "widgets_values": ["CFP/TRELLIS2_MLX_FLOATERS_REMOVED", ""]
+    },
+    {
+      "id": 8,
+      "type": "Trellis2MLXMeshReport",
+      "title": "AFTER — Cleaned Geometry Report",
+      "pos": [1620, 470],
+      "size": [470, 360],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {"localized_name": "model_3d", "name": "model_3d", "type": "FILE_3D_GLB", "link": 8}
       ],
       "outputs": [
         {"localized_name": "report", "name": "report", "type": "STRING", "slot_index": 0, "links": null},
@@ -138,19 +182,22 @@
     [1, 2, 0, 3, 0, "TRELLIS2_MLX_CONFIG"],
     [2, 1, 0, 3, 1, "IMAGE"],
     [3, 1, 1, 3, 6, "MASK"],
-    [4, 3, 0, 4, 2, "FILE_3D_GLB"],
-    [5, 3, 0, 5, 0, "FILE_3D_GLB"],
-    [6, 3, 0, 6, 0, "FILE_3D_GLB"]
+    [4, 3, 0, 4, 0, "FILE_3D_GLB"],
+    [5, 3, 0, 6, 0, "FILE_3D_GLB"],
+    [6, 4, 0, 5, 2, "FILE_3D_GLB"],
+    [7, 4, 0, 7, 0, "FILE_3D_GLB"],
+    [8, 4, 0, 8, 0, "FILE_3D_GLB"]
   ],
   "groups": [
     {"id": 1, "title": "01 — IMAGE INPUT", "bounding": [-800, 20, 400, 400], "color": "#3f789e", "font_size": 24, "flags": {}},
     {"id": 2, "title": "02 — NATIVE MLX CONFIGURATION", "bounding": [-800, 450, 510, 250], "color": "#8a6f42", "font_size": 24, "flags": {}},
-    {"id": 3, "title": "03 — TRELLIS.2 MLX RECONSTRUCTION", "bounding": [-210, 130, 490, 340], "color": "#6b4b8a", "font_size": 24, "flags": {}},
-    {"id": 4, "title": "04 — REVIEW, REPORT, AND SAVE", "bounding": [380, -130, 1160, 1050], "color": "#4d8061", "font_size": 24, "flags": {}}
+    {"id": 3, "title": "03 — GEOMETRY-ONLY RECONSTRUCTION", "bounding": [-210, 130, 490, 340], "color": "#6b4b8a", "font_size": 24, "flags": {}},
+    {"id": 4, "title": "04 — REMOVE SMALL DISCONNECTED COMPONENTS", "bounding": [370, 90, 570, 790], "color": "#8a6242", "font_size": 24, "flags": {}},
+    {"id": 5, "title": "05 — REVIEW, REPORT, AND SAVE", "bounding": [990, -130, 1150, 1050], "color": "#4d8061", "font_size": 24, "flags": {}}
   ],
   "config": {},
   "extra": {
-    "ds": {"scale": 0.82, "offset": [820, 300]},
+    "ds": {"scale": 0.72, "offset": [790, 300]},
     "frontendVersion": "1.30.6",
     "workflowRendererVersion": "LG"
   },

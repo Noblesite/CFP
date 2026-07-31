@@ -83,12 +83,15 @@ def build_environment(
     seed: int,
     steps: int,
     use_matting: bool,
+    output_mode: str = "textured",
     additional_views_manifest: Path | None = None,
 ) -> dict[str, str]:
     if not 0 <= seed <= (2**64 - 1):
         raise ValueError("seed must be an unsigned 64-bit integer")
     if not 1 <= steps <= 50:
         raise ValueError("steps must be between 1 and 50")
+    if output_mode not in {"textured", "geometry_only"}:
+        raise ValueError("output_mode must be 'textured' or 'geometry_only'")
 
     environment = dict(base_environment)
     environment.update(
@@ -101,6 +104,7 @@ def build_environment(
             "STEPS": str(steps),
             "SEED": str(seed),
             "MATTING": "on" if use_matting else "off",
+            "TEXTURE": "off" if output_mode == "geometry_only" else "on",
             "ENGINE_MEMORY_FRACTION": f"{config.memory_fraction:.2f}",
         }
     )

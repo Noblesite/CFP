@@ -16,8 +16,78 @@ The first milestone can:
 
 The repository also contains an experimental Apple-Silicon reconstruction
 adapter in `comfyui_trellis2_mlx/`. It wraps the native Swift/MLX TRELLIS.2
-engine and exposes a ComfyUI `FILE_3D_GLB` output for the proven 512-resolution
-single-image lane.
+engine and exposes a ComfyUI `FILE_3D_GLB` output for single-image and
+multi-view 512-resolution lanes. Textured and geometry-only generation are
+selectable; the geometry-only path skips learned texture inference, UV unwrap,
+rasterization, and atlas baking, then emits a texture-free GLB for faster
+manufacturing-focused iteration.
+
+The first independent mesh operation, `TRELLIS.2 MLX Remove Floaters`, removes
+only small disconnected components and pairs the result with before/after mesh
+reports. It deliberately does not conflate O-Voxel non-manifold topology with
+removable debris.
+
+The companion read-only topology diagnostic separates confirmed defects
+(duplicates, degenerates, coincident vertices, boundaries, and overloaded
+edges) from broad-phase overlap and O-Voxel shell-intersection candidates.
+
+The topology sanitizer can then weld nearly coincident vertices and remove
+duplicate or degenerate faces without remeshing. Before/after diagnostics keep
+boundary regressions visible instead of silently declaring the mesh repaired.
+
+The watertight voxel-remesh stage emits a separate candidate plus quantitative
+topology, dimensional-change, and nearest-vertex deviation reports. Source and
+candidate remain side by side until a human promotes the result.
+
+The voxel-resolution A/B workbench fans the same sanitized source into fixed
+128, 192, and 256 resolution candidates. It saves each candidate separately and
+reports detail-, dimension-, lightweight-, and balanced-priority suggestions;
+promotion always remains a human decision.
+
+The post-voxel polish then targets a narrow marching-cubes artifact: exact
+coincident face pairs with opposite winding. It deletes the complete
+zero-thickness sheet only when overloaded edges decrease without increasing
+boundaries or connected components; otherwise, it returns the source unchanged.
+
+The print-scale gate uniformly converts an approved GLB to a target physical
+height using meter-based glTF units, reports dimensions in millimeters, and
+compares the effective source voxel pitch with the selected nozzle and layer
+height. It is deliberately an advisory sampling check, not wall-thickness or
+clearance analysis.
+
+The pre-voxel background geometry guard protects character workflows from
+isotropic bounds caused by backdrop or base geometry. It reports large planar
+components but never auto-deletes them because TRELLIS O-Voxel surfaces are
+themselves composed of thin disconnected patches. Suspicious character bounds
+stop execution unless a human explicitly acknowledges them.
+
+The upstream input-mask quality gate inspects RMBG alpha before inference for
+empty or inverted masks, excessive foreground coverage, border contact, and
+disconnected noise. It preserves the RGBA image, derives standard ComfyUI mask
+polarity, and blocks expensive TRELLIS generation until suspicious input is
+corrected or explicitly acknowledged.
+
+The model-sheet workbench applies that gate independently to the populated
+000°, 090°, and 180° camera branches. All three images and masks remain
+separate through TRELLIS conditioning, and any rejected view stops the shared
+native inference run.
+
+The four-view workbench extends that baseline with the complete 270° right-side
+camera branch. This keeps the three-view workflow available for comparison
+while providing a fixed 000°, 090°, 180°, 270° cardinal model sheet.
+
+The model-sheet consistency gate adds a read-only set-level checkpoint after
+the four independent mask gates. It blocks canvas, scale, centerline, vertical
+alignment, baseline, and opposing-view width drift before native inference.
+
+The alignment-review branch renders those measurements as an annotated 2x2
+contact sheet without changing reconstruction inputs. It exposes canvas center,
+foreground bounds, subject center, and baseline for human diagnosis.
+
+The alignment-candidate branch can then create normalized copies using either
+the shared median foreground height or an explicit canvas fraction. Desired
+millimeter height remains report-only metadata until the post-reconstruction
+print-scale gate. Candidates never auto-promote into TRELLIS.
 
 It does not execute ComfyUI, segment images, reconstruct meshes, control
 Blender, or run autonomous retry loops.

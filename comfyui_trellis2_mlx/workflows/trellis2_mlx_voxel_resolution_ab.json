@@ -1,0 +1,506 @@
+{
+  "id": "cfp-trellis2-mlx-voxel-resolution-ab-v001",
+  "revision": 0,
+  "last_node_id": 24,
+  "last_link_id": 25,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "LoadImage",
+      "pos": [-760, 80],
+      "size": [315, 314],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {"localized_name": "image", "name": "image", "type": "COMBO", "widget": {"name": "image"}, "link": null},
+        {"localized_name": "choose file to upload", "name": "upload", "type": "IMAGEUPLOAD", "widget": {"name": "upload"}, "link": null}
+      ],
+      "outputs": [
+        {"localized_name": "IMAGE", "name": "IMAGE", "type": "IMAGE", "slot_index": 0, "links": [2]},
+        {"localized_name": "MASK", "name": "MASK", "type": "MASK", "slot_index": 1, "links": [3]}
+      ],
+      "properties": {"cnr_id": "comfy-core", "ver": "0.5.1", "Node name for S&R": "LoadImage"},
+      "widgets_values": ["", "image"]
+    },
+    {
+      "id": 2,
+      "type": "Trellis2MLXModel",
+      "pos": [-760, 500],
+      "size": [430, 150],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {"localized_name": "engine_binary", "name": "engine_binary", "type": "STRING", "widget": {"name": "engine_binary"}, "link": null},
+        {"localized_name": "weights_directory", "name": "weights_directory", "type": "STRING", "widget": {"name": "weights_directory"}, "link": null},
+        {"localized_name": "memory_fraction", "name": "memory_fraction", "type": "FLOAT", "widget": {"name": "memory_fraction"}, "link": null}
+      ],
+      "outputs": [
+        {"localized_name": "mlx_config", "name": "mlx_config", "type": "TRELLIS2_MLX_CONFIG", "links": [1]}
+      ],
+      "properties": {"Node name for S&R": "Trellis2MLXModel"},
+      "widgets_values": [
+        "auto",
+        "auto",
+        0.95
+      ]
+    },
+    {
+      "id": 3,
+      "type": "Trellis2MLXImageTo3D",
+      "title": "TRELLIS.2 MLX Geometry Only",
+      "pos": [-160, 190],
+      "size": [390, 230],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {"localized_name": "mlx_config", "name": "mlx_config", "type": "TRELLIS2_MLX_CONFIG", "link": 1},
+        {"localized_name": "image", "name": "image", "type": "IMAGE", "link": 2},
+        {"localized_name": "seed", "name": "seed", "type": "INT", "widget": {"name": "seed"}, "link": null},
+        {"localized_name": "steps", "name": "steps", "type": "INT", "widget": {"name": "steps"}, "link": null},
+        {"localized_name": "output_mode", "name": "output_mode", "type": "COMBO", "widget": {"name": "output_mode"}, "link": null},
+        {"localized_name": "matting", "name": "matting", "type": "COMBO", "widget": {"name": "matting"}, "link": null},
+        {"localized_name": "mask", "name": "mask", "shape": 7, "type": "MASK", "link": 3}
+      ],
+      "outputs": [
+        {"localized_name": "model_3d", "name": "model_3d", "type": "FILE_3D_GLB", "slot_index": 0, "links": [4, 5]},
+        {"localized_name": "artifact_path", "name": "artifact_path", "type": "STRING", "slot_index": 1, "links": null},
+        {"localized_name": "metrics_json", "name": "metrics_json", "type": "STRING", "slot_index": 2, "links": null},
+        {"localized_name": "engine_log", "name": "engine_log", "type": "STRING", "slot_index": 3, "links": null},
+        {"localized_name": "artifact_sha256", "name": "artifact_sha256", "type": "STRING", "slot_index": 4, "links": null}
+      ],
+      "properties": {"Node name for S&R": "Trellis2MLXImageTo3D"},
+      "widgets_values": [0, "fixed", 12, "geometry_only", "off"]
+    },
+    {
+      "id": 4,
+      "type": "Trellis2MLXRemoveFloaters",
+      "pos": [420, 150],
+      "size": [440, 230],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {"localized_name": "model_3d", "name": "model_3d", "type": "FILE_3D_GLB", "link": 4},
+        {"localized_name": "min_component_faces", "name": "min_component_faces", "type": "INT", "widget": {"name": "min_component_faces"}, "link": null},
+        {"localized_name": "min_component_ratio", "name": "min_component_ratio", "type": "FLOAT", "widget": {"name": "min_component_ratio"}, "link": null}
+      ],
+      "outputs": [
+        {"localized_name": "model_3d", "name": "model_3d", "type": "FILE_3D_GLB", "slot_index": 0, "links": [6, 7]},
+        {"localized_name": "cleanup_report", "name": "cleanup_report", "type": "STRING", "slot_index": 1, "links": null},
+        {"localized_name": "cleanup_report_json", "name": "cleanup_report_json", "type": "STRING", "slot_index": 2, "links": null},
+        {"localized_name": "status", "name": "status", "type": "STRING", "slot_index": 3, "links": null}
+      ],
+      "properties": {"Node name for S&R": "Trellis2MLXRemoveFloaters"},
+      "widgets_values": [100, 0.001]
+    },
+    {
+      "id": 5,
+      "type": "Preview3D",
+      "title": "SOURCE — Sanitized Geometry",
+      "pos": [1540, -80],
+      "size": [520, 620],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {"localized_name": "camera_info", "name": "camera_info", "shape": 7, "type": "LOAD3D_CAMERA", "link": null},
+        {"localized_name": "bg_image", "name": "bg_image", "shape": 7, "type": "IMAGE", "link": null},
+        {"localized_name": "model_file", "name": "model_file", "type": "STRING,FILE_3D_GLB,FILE_3D_GLTF,FILE_3D_FBX,FILE_3D_OBJ,FILE_3D_STL,FILE_3D_USDZ,FILE_3D", "widget": {"name": "model_file"}, "link": 8},
+        {"localized_name": "image", "name": "image", "type": "PREVIEW_3D", "widget": {"name": "image"}, "link": null}
+      ],
+      "outputs": [],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.5.1",
+        "Node name for S&R": "Preview3D",
+        "Scene Config": {"showGrid": true, "backgroundColor": "#282828", "backgroundImage": "", "backgroundRenderMode": "tiled"},
+        "Light Config": {"intensity": 3}
+      },
+      "widgets_values": ["", ""]
+    },
+    {
+      "id": 6,
+      "type": "Trellis2MLXMeshReport",
+      "title": "BEFORE — Raw Geometry Report",
+      "pos": [420, 470],
+      "size": [470, 360],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {"localized_name": "model_3d", "name": "model_3d", "type": "FILE_3D_GLB", "link": 5}
+      ],
+      "outputs": [
+        {"localized_name": "report", "name": "report", "type": "STRING", "slot_index": 0, "links": null},
+        {"localized_name": "report_json", "name": "report_json", "type": "STRING", "slot_index": 1, "links": null},
+        {"localized_name": "status", "name": "status", "type": "STRING", "slot_index": 2, "links": null}
+      ],
+      "properties": {"Node name for S&R": "Trellis2MLXMeshReport"},
+      "widgets_values": []
+    },
+    {
+      "id": 7,
+      "type": "SaveGLB",
+      "pos": [3320, 120],
+      "size": [420, 280],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {"localized_name": "mesh", "name": "mesh", "type": "MESH,FILE_3D_GLB,FILE_3D_GLTF,FILE_3D_OBJ,FILE_3D_FBX,FILE_3D_STL,FILE_3D_USDZ,FILE_3D_PLY,FILE_3D_SPLAT,FILE_3D_SPZ,FILE_3D_KSPLAT,FILE_3D_SPLAT_ANY,FILE_3D_POINT_CLOUD_ANY,FILE_3D", "link": 14},
+        {"localized_name": "filename_prefix", "name": "filename_prefix", "type": "STRING", "widget": {"name": "filename_prefix"}, "link": null},
+        {"localized_name": "image", "name": "image", "type": "PREVIEW_3D", "widget": {"name": "image"}, "link": null}
+      ],
+      "outputs": [],
+      "properties": {"cnr_id": "comfy-core", "ver": "0.5.1", "Node name for S&R": "SaveGLB"},
+      "widgets_values": ["CFP/TRELLIS2_MLX_VOXEL_192", ""]
+    },
+    {
+      "id": 8,
+      "type": "Trellis2MLXMeshReport",
+      "title": "192 — Candidate Mesh Report",
+      "pos": [3320, 470],
+      "size": [470, 360],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {"localized_name": "model_3d", "name": "model_3d", "type": "FILE_3D_GLB", "link": 15}
+      ],
+      "outputs": [
+        {"localized_name": "report", "name": "report", "type": "STRING", "slot_index": 0, "links": null},
+        {"localized_name": "report_json", "name": "report_json", "type": "STRING", "slot_index": 1, "links": null},
+        {"localized_name": "status", "name": "status", "type": "STRING", "slot_index": 2, "links": null}
+      ],
+      "properties": {"Node name for S&R": "Trellis2MLXMeshReport"},
+      "widgets_values": []
+    },
+    {
+      "id": 9,
+      "type": "Trellis2MLXTopologyDiagnostics",
+      "title": "BEFORE SANITIZER — O-Voxel Diagnostics",
+      "pos": [920, 470],
+      "size": [530, 470],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {"localized_name": "model_3d", "name": "model_3d", "type": "FILE_3D_GLB", "link": 7},
+        {"localized_name": "coordinate_tolerance_ratio", "name": "coordinate_tolerance_ratio", "type": "FLOAT", "widget": {"name": "coordinate_tolerance_ratio"}, "link": null}
+      ],
+      "outputs": [
+        {"localized_name": "diagnostic_report", "name": "diagnostic_report", "type": "STRING", "slot_index": 0, "links": null},
+        {"localized_name": "diagnostic_json", "name": "diagnostic_json", "type": "STRING", "slot_index": 1, "links": null},
+        {"localized_name": "status", "name": "status", "type": "STRING", "slot_index": 2, "links": null}
+      ],
+      "properties": {"Node name for S&R": "Trellis2MLXTopologyDiagnostics"},
+      "widgets_values": [1e-8]
+    },
+    {
+      "id": 10,
+      "type": "Trellis2MLXTopologySanitizer",
+      "pos": [920, 150],
+      "size": [500, 230],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {"localized_name": "model_3d", "name": "model_3d", "type": "FILE_3D_GLB", "link": 6},
+        {"localized_name": "weld_tolerance_ratio", "name": "weld_tolerance_ratio", "type": "FLOAT", "widget": {"name": "weld_tolerance_ratio"}, "link": null}
+      ],
+      "outputs": [
+        {"localized_name": "model_3d", "name": "model_3d", "type": "FILE_3D_GLB", "slot_index": 0, "links": [8, 11, 12, 17, 18]},
+        {"localized_name": "sanitizer_report", "name": "sanitizer_report", "type": "STRING", "slot_index": 1, "links": null},
+        {"localized_name": "sanitizer_report_json", "name": "sanitizer_report_json", "type": "STRING", "slot_index": 2, "links": null},
+        {"localized_name": "status", "name": "status", "type": "STRING", "slot_index": 3, "links": null}
+      ],
+      "properties": {"Node name for S&R": "Trellis2MLXTopologySanitizer"},
+      "widgets_values": [1e-8]
+    },
+    {
+      "id": 11,
+      "type": "Trellis2MLXTopologyDiagnostics",
+      "title": "BEFORE VOXEL — Sanitized Diagnostics",
+      "pos": [1540, 620],
+      "size": [530, 470],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        {"localized_name": "model_3d", "name": "model_3d", "type": "FILE_3D_GLB", "link": 11},
+        {"localized_name": "coordinate_tolerance_ratio", "name": "coordinate_tolerance_ratio", "type": "FLOAT", "widget": {"name": "coordinate_tolerance_ratio"}, "link": null}
+      ],
+      "outputs": [
+        {"localized_name": "diagnostic_report", "name": "diagnostic_report", "type": "STRING", "slot_index": 0, "links": null},
+        {"localized_name": "diagnostic_json", "name": "diagnostic_json", "type": "STRING", "slot_index": 1, "links": null},
+        {"localized_name": "status", "name": "status", "type": "STRING", "slot_index": 2, "links": null}
+      ],
+      "properties": {"Node name for S&R": "Trellis2MLXTopologyDiagnostics"},
+      "widgets_values": [1e-8]
+    },
+    {
+      "id": 12,
+      "type": "Trellis2MLXVoxelRemeshCandidate",
+      "title": "VOXEL 192 — Balanced Candidate",
+      "pos": [2120, 150],
+      "size": [500, 230],
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [
+        {"localized_name": "model_3d", "name": "model_3d", "type": "FILE_3D_GLB", "link": 12},
+        {"localized_name": "target_resolution", "name": "target_resolution", "type": "INT", "widget": {"name": "target_resolution"}, "link": null}
+      ],
+      "outputs": [
+        {"localized_name": "candidate_3d", "name": "candidate_3d", "type": "FILE_3D_GLB", "slot_index": 0, "links": [13, 14, 15, 16]},
+        {"localized_name": "candidate_report", "name": "candidate_report", "type": "STRING", "slot_index": 1, "links": null},
+        {"localized_name": "candidate_report_json", "name": "candidate_report_json", "type": "STRING", "slot_index": 2, "links": [24]},
+        {"localized_name": "status", "name": "status", "type": "STRING", "slot_index": 3, "links": null}
+      ],
+      "properties": {"Node name for S&R": "Trellis2MLXVoxelRemeshCandidate"},
+      "widgets_values": [192]
+    },
+    {
+      "id": 13,
+      "type": "Preview3D",
+      "title": "192 — Candidate Preview",
+      "pos": [2700, -80],
+      "size": [520, 620],
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "inputs": [
+        {"localized_name": "camera_info", "name": "camera_info", "shape": 7, "type": "LOAD3D_CAMERA", "link": null},
+        {"localized_name": "bg_image", "name": "bg_image", "shape": 7, "type": "IMAGE", "link": null},
+        {"localized_name": "model_file", "name": "model_file", "type": "STRING,FILE_3D_GLB,FILE_3D_GLTF,FILE_3D_FBX,FILE_3D_OBJ,FILE_3D_STL,FILE_3D_USDZ,FILE_3D", "widget": {"name": "model_file"}, "link": 13},
+        {"localized_name": "image", "name": "image", "type": "PREVIEW_3D", "widget": {"name": "image"}, "link": null}
+      ],
+      "outputs": [],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.5.1",
+        "Node name for S&R": "Preview3D",
+        "Scene Config": {"showGrid": true, "backgroundColor": "#282828", "backgroundImage": "", "backgroundRenderMode": "tiled"},
+        "Light Config": {"intensity": 3}
+      },
+      "widgets_values": ["", ""]
+    },
+    {
+      "id": 16,
+      "type": "Trellis2MLXTopologyDiagnostics",
+      "title": "192 — Candidate Diagnostics",
+      "pos": [3820, 760],
+      "size": [530, 470],
+      "flags": {},
+      "order": 13,
+      "mode": 0,
+      "inputs": [
+        {"localized_name": "model_3d", "name": "model_3d", "type": "FILE_3D_GLB", "link": 16},
+        {"localized_name": "coordinate_tolerance_ratio", "name": "coordinate_tolerance_ratio", "type": "FLOAT", "widget": {"name": "coordinate_tolerance_ratio"}, "link": null}
+      ],
+      "outputs": [
+        {"localized_name": "diagnostic_report", "name": "diagnostic_report", "type": "STRING", "slot_index": 0, "links": null},
+        {"localized_name": "diagnostic_json", "name": "diagnostic_json", "type": "STRING", "slot_index": 1, "links": null},
+        {"localized_name": "status", "name": "status", "type": "STRING", "slot_index": 2, "links": null}
+      ],
+      "properties": {"Node name for S&R": "Trellis2MLXTopologyDiagnostics"},
+      "widgets_values": [1e-8]
+    },
+    {
+      "id": 17,
+      "type": "Trellis2MLXVoxelRemeshCandidate",
+      "title": "VOXEL 128 — Lightweight Candidate",
+      "pos": [2120, -650],
+      "size": [500, 230],
+      "flags": {},
+      "order": 14,
+      "mode": 0,
+      "inputs": [
+        {"localized_name": "model_3d", "name": "model_3d", "type": "FILE_3D_GLB", "link": 17},
+        {"localized_name": "target_resolution", "name": "target_resolution", "type": "INT", "widget": {"name": "target_resolution"}, "link": null}
+      ],
+      "outputs": [
+        {"localized_name": "candidate_3d", "name": "candidate_3d", "type": "FILE_3D_GLB", "slot_index": 0, "links": [19, 20]},
+        {"localized_name": "candidate_report", "name": "candidate_report", "type": "STRING", "slot_index": 1, "links": null},
+        {"localized_name": "candidate_report_json", "name": "candidate_report_json", "type": "STRING", "slot_index": 2, "links": [23]},
+        {"localized_name": "status", "name": "status", "type": "STRING", "slot_index": 3, "links": null}
+      ],
+      "properties": {"Node name for S&R": "Trellis2MLXVoxelRemeshCandidate"},
+      "widgets_values": [128]
+    },
+    {
+      "id": 18,
+      "type": "Preview3D",
+      "title": "128 — Candidate Preview",
+      "pos": [2700, -1000],
+      "size": [520, 620],
+      "flags": {},
+      "order": 15,
+      "mode": 0,
+      "inputs": [
+        {"localized_name": "camera_info", "name": "camera_info", "shape": 7, "type": "LOAD3D_CAMERA", "link": null},
+        {"localized_name": "bg_image", "name": "bg_image", "shape": 7, "type": "IMAGE", "link": null},
+        {"localized_name": "model_file", "name": "model_file", "type": "STRING,FILE_3D_GLB,FILE_3D_GLTF,FILE_3D_FBX,FILE_3D_OBJ,FILE_3D_STL,FILE_3D_USDZ,FILE_3D", "widget": {"name": "model_file"}, "link": 19},
+        {"localized_name": "image", "name": "image", "type": "PREVIEW_3D", "widget": {"name": "image"}, "link": null}
+      ],
+      "outputs": [],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.5.1",
+        "Node name for S&R": "Preview3D",
+        "Scene Config": {"showGrid": true, "backgroundColor": "#282828", "backgroundImage": "", "backgroundRenderMode": "tiled"},
+        "Light Config": {"intensity": 3}
+      },
+      "widgets_values": ["", ""]
+    },
+    {
+      "id": 19,
+      "type": "SaveGLB",
+      "pos": [3320, -820],
+      "size": [420, 280],
+      "flags": {},
+      "order": 16,
+      "mode": 0,
+      "inputs": [
+        {"localized_name": "mesh", "name": "mesh", "type": "MESH,FILE_3D_GLB,FILE_3D_GLTF,FILE_3D_OBJ,FILE_3D_FBX,FILE_3D_STL,FILE_3D_USDZ,FILE_3D_PLY,FILE_3D_SPLAT,FILE_3D_SPZ,FILE_3D_KSPLAT,FILE_3D_SPLAT_ANY,FILE_3D_POINT_CLOUD_ANY,FILE_3D", "link": 20},
+        {"localized_name": "filename_prefix", "name": "filename_prefix", "type": "STRING", "widget": {"name": "filename_prefix"}, "link": null},
+        {"localized_name": "image", "name": "image", "type": "PREVIEW_3D", "widget": {"name": "image"}, "link": null}
+      ],
+      "outputs": [],
+      "properties": {"cnr_id": "comfy-core", "ver": "0.5.1", "Node name for S&R": "SaveGLB"},
+      "widgets_values": ["CFP/TRELLIS2_MLX_VOXEL_128", ""]
+    },
+    {
+      "id": 21,
+      "type": "Trellis2MLXVoxelRemeshCandidate",
+      "title": "VOXEL 256 — Detail Candidate",
+      "pos": [2120, 950],
+      "size": [500, 230],
+      "flags": {},
+      "order": 17,
+      "mode": 0,
+      "inputs": [
+        {"localized_name": "model_3d", "name": "model_3d", "type": "FILE_3D_GLB", "link": 18},
+        {"localized_name": "target_resolution", "name": "target_resolution", "type": "INT", "widget": {"name": "target_resolution"}, "link": null}
+      ],
+      "outputs": [
+        {"localized_name": "candidate_3d", "name": "candidate_3d", "type": "FILE_3D_GLB", "slot_index": 0, "links": [21, 22]},
+        {"localized_name": "candidate_report", "name": "candidate_report", "type": "STRING", "slot_index": 1, "links": null},
+        {"localized_name": "candidate_report_json", "name": "candidate_report_json", "type": "STRING", "slot_index": 2, "links": [25]},
+        {"localized_name": "status", "name": "status", "type": "STRING", "slot_index": 3, "links": null}
+      ],
+      "properties": {"Node name for S&R": "Trellis2MLXVoxelRemeshCandidate"},
+      "widgets_values": [256]
+    },
+    {
+      "id": 22,
+      "type": "Preview3D",
+      "title": "256 — Candidate Preview",
+      "pos": [2700, 760],
+      "size": [520, 620],
+      "flags": {},
+      "order": 18,
+      "mode": 0,
+      "inputs": [
+        {"localized_name": "camera_info", "name": "camera_info", "shape": 7, "type": "LOAD3D_CAMERA", "link": null},
+        {"localized_name": "bg_image", "name": "bg_image", "shape": 7, "type": "IMAGE", "link": null},
+        {"localized_name": "model_file", "name": "model_file", "type": "STRING,FILE_3D_GLB,FILE_3D_GLTF,FILE_3D_FBX,FILE_3D_OBJ,FILE_3D_STL,FILE_3D_USDZ,FILE_3D", "widget": {"name": "model_file"}, "link": 21},
+        {"localized_name": "image", "name": "image", "type": "PREVIEW_3D", "widget": {"name": "image"}, "link": null}
+      ],
+      "outputs": [],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.5.1",
+        "Node name for S&R": "Preview3D",
+        "Scene Config": {"showGrid": true, "backgroundColor": "#282828", "backgroundImage": "", "backgroundRenderMode": "tiled"},
+        "Light Config": {"intensity": 3}
+      },
+      "widgets_values": ["", ""]
+    },
+    {
+      "id": 23,
+      "type": "SaveGLB",
+      "pos": [3320, 960],
+      "size": [420, 280],
+      "flags": {},
+      "order": 19,
+      "mode": 0,
+      "inputs": [
+        {"localized_name": "mesh", "name": "mesh", "type": "MESH,FILE_3D_GLB,FILE_3D_GLTF,FILE_3D_OBJ,FILE_3D_FBX,FILE_3D_STL,FILE_3D_USDZ,FILE_3D_PLY,FILE_3D_SPLAT,FILE_3D_SPZ,FILE_3D_KSPLAT,FILE_3D_SPLAT_ANY,FILE_3D_POINT_CLOUD_ANY,FILE_3D", "link": 22},
+        {"localized_name": "filename_prefix", "name": "filename_prefix", "type": "STRING", "widget": {"name": "filename_prefix"}, "link": null},
+        {"localized_name": "image", "name": "image", "type": "PREVIEW_3D", "widget": {"name": "image"}, "link": null}
+      ],
+      "outputs": [],
+      "properties": {"cnr_id": "comfy-core", "ver": "0.5.1", "Node name for S&R": "SaveGLB"},
+      "widgets_values": ["CFP/TRELLIS2_MLX_VOXEL_256", ""]
+    },
+    {
+      "id": 24,
+      "type": "Trellis2MLXVoxelCandidateComparison",
+      "title": "128 / 192 / 256 — Human Review Comparison",
+      "pos": [3820, 80],
+      "size": [650, 520],
+      "flags": {},
+      "order": 20,
+      "mode": 0,
+      "inputs": [
+        {"localized_name": "report_128", "name": "report_128", "type": "STRING", "widget": {"name": "report_128"}, "link": 23},
+        {"localized_name": "report_192", "name": "report_192", "type": "STRING", "widget": {"name": "report_192"}, "link": 24},
+        {"localized_name": "report_256", "name": "report_256", "type": "STRING", "widget": {"name": "report_256"}, "link": 25}
+      ],
+      "outputs": [
+        {"localized_name": "comparison_report", "name": "comparison_report", "type": "STRING", "slot_index": 0, "links": null},
+        {"localized_name": "comparison_json", "name": "comparison_json", "type": "STRING", "slot_index": 1, "links": null},
+        {"localized_name": "status", "name": "status", "type": "STRING", "slot_index": 2, "links": null}
+      ],
+      "properties": {"Node name for S&R": "Trellis2MLXVoxelCandidateComparison"},
+      "widgets_values": ["", "", ""]
+    }
+  ],
+  "links": [
+    [1, 2, 0, 3, 0, "TRELLIS2_MLX_CONFIG"],
+    [2, 1, 0, 3, 1, "IMAGE"],
+    [3, 1, 1, 3, 6, "MASK"],
+    [4, 3, 0, 4, 0, "FILE_3D_GLB"],
+    [5, 3, 0, 6, 0, "FILE_3D_GLB"],
+    [6, 4, 0, 10, 0, "FILE_3D_GLB"],
+    [7, 4, 0, 9, 0, "FILE_3D_GLB"],
+    [8, 10, 0, 5, 2, "FILE_3D_GLB"],
+    [11, 10, 0, 11, 0, "FILE_3D_GLB"],
+    [12, 10, 0, 12, 0, "FILE_3D_GLB"],
+    [13, 12, 0, 13, 2, "FILE_3D_GLB"],
+    [14, 12, 0, 7, 0, "FILE_3D_GLB"],
+    [15, 12, 0, 8, 0, "FILE_3D_GLB"],
+    [16, 12, 0, 16, 0, "FILE_3D_GLB"],
+    [17, 10, 0, 17, 0, "FILE_3D_GLB"],
+    [18, 10, 0, 21, 0, "FILE_3D_GLB"],
+    [19, 17, 0, 18, 2, "FILE_3D_GLB"],
+    [20, 17, 0, 19, 0, "FILE_3D_GLB"],
+    [21, 21, 0, 22, 2, "FILE_3D_GLB"],
+    [22, 21, 0, 23, 0, "FILE_3D_GLB"],
+    [23, 17, 2, 24, 0, "STRING"],
+    [24, 12, 2, 24, 1, "STRING"],
+    [25, 21, 2, 24, 2, "STRING"]
+  ],
+  "groups": [
+    {"id": 1, "title": "01 — IMAGE INPUT", "bounding": [-800, 20, 400, 400], "color": "#3f789e", "font_size": 24, "flags": {}},
+    {"id": 2, "title": "02 — NATIVE MLX CONFIGURATION", "bounding": [-800, 450, 510, 250], "color": "#8a6f42", "font_size": 24, "flags": {}},
+    {"id": 3, "title": "03 — GEOMETRY-ONLY RECONSTRUCTION", "bounding": [-210, 130, 490, 340], "color": "#6b4b8a", "font_size": 24, "flags": {}},
+    {"id": 4, "title": "04 — REMOVE SMALL DISCONNECTED COMPONENTS", "bounding": [370, 90, 570, 790], "color": "#8a6242", "font_size": 24, "flags": {}},
+    {"id": 5, "title": "05 — SANITIZE AND COMPARE", "bounding": [870, 90, 620, 930], "color": "#7a5c88", "font_size": 24, "flags": {}},
+    {"id": 6, "title": "06 — SOURCE REVIEW", "bounding": [1510, -130, 570, 1120], "color": "#4d8061", "font_size": 24, "flags": {}},
+    {"id": 7, "title": "07 — VOXEL 128 / 192 / 256 CANDIDATES", "bounding": [2070, -710, 600, 1960], "color": "#476f8f", "font_size": 24, "flags": {}},
+    {"id": 8, "title": "08 — SIDE-BY-SIDE CANDIDATE REVIEW", "bounding": [2670, -1050, 1730, 2470], "color": "#4d8061", "font_size": 24, "flags": {}},
+    {"id": 9, "title": "09 — COMPARISON REPORT", "bounding": [3770, 20, 750, 640], "color": "#8a6f42", "font_size": 24, "flags": {}}
+  ],
+  "config": {},
+  "extra": {
+    "ds": {"scale": 0.55, "offset": [590, 400]},
+    "frontendVersion": "1.30.6",
+    "workflowRendererVersion": "LG"
+  },
+  "version": 0.4
+}
