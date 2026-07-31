@@ -48,8 +48,11 @@ from .mesh_report import analyze_glb, format_mesh_report, mesh_report_json
 from .runner import (
     Trellis2MLXConditioningArtifact,
     Trellis2MLXConfig,
+    Trellis2MLXSparseStructureArtifact,
     build_environment,
+    build_sparse_environment,
     default_paths,
+    inspect_safetensors,
     run_engine,
 )
 from .topology_diagnostics import (
@@ -687,6 +690,83 @@ def _run_conditioning(
     )
 
 
+def _run_sparse_structure(
+    *,
+    mlx_config: Trellis2MLXConfig,
+    conditioning: Trellis2MLXConditioningArtifact,
+    seed: int,
+    steps: int,
+):
+    temp_directory = Path(folder_paths.get_temp_directory())
+    temp_directory.mkdir(parents=True, exist_ok=True)
+    run_id = uuid.uuid4().hex
+    output_path = temp_directory / f"trellis2_mlx_sparse_{run_id}.safetensors"
+    metrics_path = temp_directory / f"trellis2_mlx_sparse_{run_id}_report.json"
+    environment = build_sparse_environment(
+        dict(os.environ),
+        config=mlx_config,
+        conditioning_path=conditioning.path,
+        output_path=output_path,
+        metrics_path=metrics_path,
+        seed=seed,
+        steps=steps,
+    )
+
+    comfy.model_management.unload_all_models()
+    comfy.model_management.soft_empty_cache(force=True)
+    progress = comfy.utils.ProgressBar(100)
+
+    def on_log(line: str) -> None:
+        log.info("[sparse-engine] %s", line)
+        if "prepare OK" in line:
+            progress.update_absolute(40)
+        elif "sparse structure OK" in line:
+            progress.update_absolute(95)
+        elif "wrote sparse structure" in line:
+            progress.update_absolute(100)
+
+    metrics, engine_log = run_engine(
+        config=mlx_config,
+        environment=environment,
+        output_path=output_path,
+        metrics_path=metrics_path,
+        on_log=on_log,
+        check_cancelled=comfy.model_management.throw_exception_if_processing_interrupted,
+        artifact_kind="sparse_safetensors",
+    )
+    metrics["source_conditioning_path"] = str(conditioning.path)
+    metrics["source_conditioning_sha256"] = conditioning.artifact_sha256
+    metrics["automatic_promotion"] = False
+    report_json = json.dumps(metrics, indent=2, sort_keys=True)
+    voxel_count = int(metrics.get("voxel_count", 0))
+    report_text = (
+        "TRELLIS.2 MLX Sparse Structure\n"
+        f"Status: {metrics.get('status', 'SPARSE_STRUCTURE_READY')}\n"
+        f"32³ occupied voxels: {voxel_count:,}\n"
+        f"Seed / steps: {seed} / {steps}\n"
+        f"Artifact: {output_path}\n"
+        "Shape generated: No\n"
+        "Mesh generated: No\n"
+        "Automatic promotion: No"
+    )
+    artifact = Trellis2MLXSparseStructureArtifact(
+        path=output_path,
+        source_conditioning_sha256=conditioning.artifact_sha256,
+        voxel_count=voxel_count,
+        artifact_sha256=metrics["artifact_sha256"],
+    )
+    return IO.NodeOutput(
+        artifact,
+        str(output_path),
+        report_text,
+        report_json,
+        engine_log,
+        metrics["artifact_sha256"],
+        metrics.get("status", "SPARSE_STRUCTURE_READY"),
+        ui={"text": [report_text]},
+    )
+
+
 class Trellis2MLXModel(IO.ComfyNode):
     @classmethod
     def define_schema(cls):
@@ -808,6 +888,103 @@ class Trellis2MLXImageConditioning(IO.ComfyNode):
         ]
         views = [(angle, image, mask) for angle, image, mask in candidates if image is not None]
         return _run_conditioning(mlx_config=mlx_config, views=views, matting=matting)
+
+
+class Trellis2MLXLoadConditioningArtifact(IO.ComfyNode):
+    @classmethod
+    def define_schema(cls):
+        return IO.Schema(
+            node_id="Trellis2MLXLoadConditioningArtifact",
+            display_name="TRELLIS.2 MLX Load Conditioning Artifact",
+            category="The Foundry/TRELLIS.2 MLX/Stages",
+            description=(
+                "Load and validate a human-promoted CFP conditioning safetensors artifact. "
+                "The source path is explicit so this workflow does not depend on hidden state."
+            ),
+            inputs=[
+                IO.String.Input(
+                    "artifact_path",
+                    default="/path/to/trellis2_mlx_conditioning.safetensors",
+                    multiline=False,
+                ),
+            ],
+            outputs=[
+                IO.Custom("TRELLIS2_MLX_CONDITIONING").Output(display_name="conditioning"),
+                IO.String.Output(display_name="artifact_sha256"),
+                IO.String.Output(display_name="status"),
+            ],
+        )
+
+    @classmethod
+    def execute(cls, artifact_path: str):
+        path = Path(artifact_path).expanduser().resolve()
+        header, artifact_sha256 = inspect_safetensors(path)
+        metadata = header.get("__metadata__", {})
+        if metadata.get("schema") != "cfp.trellis2-mlx-conditioning.v1":
+            raise ValueError(
+                "Expected a cfp.trellis2-mlx-conditioning.v1 artifact; "
+                f"found {metadata.get('schema', 'no schema metadata')}"
+            )
+        if "cond_512" not in header or "neg_cond_512" not in header:
+            raise ValueError("Conditioning artifact is missing cond_512 or neg_cond_512")
+        raw_angles = metadata.get("view_angles", "")
+        view_angles = tuple(int(value) for value in raw_angles.split(",") if value.strip())
+        artifact = Trellis2MLXConditioningArtifact(
+            path=path,
+            view_angles=view_angles,
+            tier=metadata.get("tier", "res512"),
+            artifact_sha256=artifact_sha256,
+        )
+        return IO.NodeOutput(artifact, artifact_sha256, "CONDITIONING_LOADED")
+
+
+class Trellis2MLXSparseStructure(IO.ComfyNode):
+    @classmethod
+    def fingerprint_inputs(cls, **kwargs):
+        return float("nan")
+
+    @classmethod
+    def define_schema(cls):
+        return IO.Schema(
+            node_id="Trellis2MLXSparseStructure",
+            display_name="TRELLIS.2 MLX Sparse Structure",
+            category="The Foundry/TRELLIS.2 MLX/Stages",
+            description=(
+                "Consume approved DINOv3 conditioning and stop after TRELLIS.2 sparse-structure "
+                "sampling and 32³ occupancy decoding. Shape, texture, and mesh stages do not run."
+            ),
+            is_output_node=True,
+            inputs=[
+                IO.Custom("TRELLIS2_MLX_CONFIG").Input("mlx_config"),
+                IO.Custom("TRELLIS2_MLX_CONDITIONING").Input("conditioning"),
+                IO.Int.Input("seed", default=0, min=0, max=2**64 - 1),
+                IO.Int.Input("steps", default=12, min=1, max=50),
+            ],
+            outputs=[
+                IO.Custom("TRELLIS2_MLX_SPARSE_STRUCTURE").Output(display_name="sparse_structure"),
+                IO.String.Output(display_name="artifact_path"),
+                IO.String.Output(display_name="sparse_report"),
+                IO.String.Output(display_name="sparse_report_json"),
+                IO.String.Output(display_name="engine_log"),
+                IO.String.Output(display_name="artifact_sha256"),
+                IO.String.Output(display_name="status"),
+            ],
+        )
+
+    @classmethod
+    def execute(
+        cls,
+        mlx_config: Trellis2MLXConfig,
+        conditioning: Trellis2MLXConditioningArtifact,
+        seed: int,
+        steps: int,
+    ):
+        return _run_sparse_structure(
+            mlx_config=mlx_config,
+            conditioning=conditioning,
+            seed=seed,
+            steps=steps,
+        )
 
 
 class Trellis2MLXImageTo3D(IO.ComfyNode):
@@ -1524,6 +1701,9 @@ __all__ = [
     "Trellis2MLXModelSheetAlignmentReview",
     "Trellis2MLXModelSheetAlignmentCandidate",
     "Trellis2MLXModel",
+    "Trellis2MLXImageConditioning",
+    "Trellis2MLXLoadConditioningArtifact",
+    "Trellis2MLXSparseStructure",
     "Trellis2MLXImageTo3D",
     "Trellis2MLXMultiViewTo3D",
     "Trellis2MLXMeshReport",

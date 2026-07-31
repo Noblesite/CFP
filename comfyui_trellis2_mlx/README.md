@@ -43,6 +43,15 @@ stops: sparse structure, shape, texture, mesh extraction, and GLB export do not
 run. The typed `TRELLIS2_MLX_CONDITIONING` output is reserved for the next
 standalone sparse-generation workflow; automatic promotion is disabled.
 
+`TRELLIS.2 MLX Load Conditioning Artifact` begins the next single-purpose
+workflow from an explicit, human-promoted artifact path. It validates the CFP
+conditioning schema and content hash before producing the typed handoff.
+`TRELLIS.2 MLX Sparse Structure` then runs only the sparse-structure sampler
+and decoder and writes the occupied `(batch,x,y,z)` coordinates on TRELLIS's
+32³ grid. Shape SLat, texture, mesh extraction, topology operations, and GLB
+export remain out of scope. Because this artifact is not yet a surface mesh,
+this stage has a report rather than a 3D mesh preview.
+
 ## Install
 
 Run the installer with the target ComfyUI checkout:
@@ -147,6 +156,11 @@ stacked duplicate sheets reveals additional boundaries. It does not remesh,
 fill holes, or resolve O-Voxel shell junctions. Use it only on geometry-focused
 GLBs and review its output before promotion.
 
+Every bundled workflow that invokes the sanitizer now includes a
+`BEFORE SANITIZER — Untouched Incoming Mesh` 3D preview. That preview and the
+sanitizer are wired to the exact same source output, so the raw baseline is
+visible before any topology mutation occurs.
+
 `TRELLIS.2 MLX Watertight Voxel Remesh Candidate` creates a separate filled
 voxel grid and marching-cubes surface at an adjustable resolution. It reports
 topology before and after, dimensional change, and deterministic bidirectional
@@ -215,6 +229,7 @@ ComfyUI/user/default/workflows/CFP/CFP_TRELLIS2_MLX_Image_to_3D_v001.json
 ComfyUI/user/default/workflows/CFP/CFP_TRELLIS2_MLX_Background_Clean_v001.json
 ComfyUI/user/default/workflows/CFP/CFP_TRELLIS2_MLX_MultiView_v001.json
 ComfyUI/user/default/workflows/CFP/CFP_TRELLIS2_MLX_Image_Conditioning_v001.json
+ComfyUI/user/default/workflows/CFP/CFP_TRELLIS2_MLX_Sparse_Structure_v001.json
 ComfyUI/user/default/workflows/CFP/CFP_TRELLIS2_MLX_Geometry_Only_v001.json
 ComfyUI/user/default/workflows/CFP/CFP_TRELLIS2_MLX_Remove_Floaters_v001.json
 ComfyUI/user/default/workflows/CFP/CFP_TRELLIS2_MLX_Topology_Diagnostics_v001.json

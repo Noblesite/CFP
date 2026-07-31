@@ -73,6 +73,14 @@ class Trellis2MLXConditioningArtifact:
     artifact_sha256: str
 
 
+@dataclass(frozen=True)
+class Trellis2MLXSparseStructureArtifact:
+    path: Path
+    source_conditioning_sha256: str
+    voxel_count: int
+    artifact_sha256: str
+
+
 def default_paths(node_directory: Path) -> tuple[Path, Path]:
     project_root = node_directory.resolve().parent
     engine = (
@@ -139,6 +147,58 @@ def build_environment(
     else:
         environment.pop("ADDITIONAL_VIEWS_MANIFEST", None)
     return environment
+
+
+def build_sparse_environment(
+    base_environment: dict[str, str],
+    *,
+    config: Trellis2MLXConfig,
+    conditioning_path: Path,
+    output_path: Path,
+    metrics_path: Path,
+    seed: int,
+    steps: int,
+) -> dict[str, str]:
+    if not 0 <= seed <= (2**64 - 1):
+        raise ValueError("seed must be an unsigned 64-bit integer")
+    if not 1 <= steps <= 50:
+        raise ValueError("steps must be between 1 and 50")
+
+    environment = dict(base_environment)
+    environment.update(
+        {
+            "WEIGHTS_DIR": str(config.weights_directory),
+            "IN_CONDITIONING": str(conditioning_path),
+            "OUT_SPARSE": str(output_path),
+            "METRICS_JSON": str(metrics_path),
+            "HR_RES": "512",
+            "STEPS": str(steps),
+            "SEED": str(seed),
+            "MATTING": "off",
+            "TEXTURE": "off",
+            "ENGINE_MEMORY_FRACTION": f"{config.memory_fraction:.2f}",
+            "ENGINE_STAGE": "sparse",
+        }
+    )
+    for key in ("IMG", "OUT_GLB", "OUT_CONDITIONING", "VIEW_ANGLES", "ADDITIONAL_VIEWS_MANIFEST"):
+        environment.pop(key, None)
+    return environment
+
+
+def inspect_safetensors(path: Path) -> tuple[dict, str]:
+    if not path.is_file():
+        raise FileNotFoundError(f"Safetensors artifact not found: {path}")
+    artifact_bytes = path.read_bytes()
+    if len(artifact_bytes) < 12:
+        raise RuntimeError(f"Safetensors artifact is too small: {path}")
+    header_size = int.from_bytes(artifact_bytes[:8], byteorder="little", signed=False)
+    if header_size <= 2 or header_size > len(artifact_bytes) - 8:
+        raise RuntimeError(f"Safetensors artifact has an invalid header: {path}")
+    try:
+        header = json.loads(artifact_bytes[8 : 8 + header_size].decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise RuntimeError(f"Safetensors artifact has an unreadable header: {path}") from error
+    return header, hashlib.sha256(artifact_bytes).hexdigest()
 
 
 def run_engine(
@@ -224,14 +284,14 @@ def run_engine(
     if process.returncode != 0:
         tail = "\n".join(lines[-40:])
         raise RuntimeError(f"TRELLIS.2 MLX engine exited with code {process.returncode}.\n{tail}")
-    if artifact_kind not in {"glb", "safetensors"}:
-        raise ValueError("artifact_kind must be 'glb' or 'safetensors'")
+    if artifact_kind not in {"glb", "safetensors", "sparse_safetensors"}:
+        raise ValueError("artifact_kind must be 'glb', 'safetensors', or 'sparse_safetensors'")
     if not output_path.is_file() or output_path.stat().st_size < 12:
         raise RuntimeError(f"TRELLIS.2 MLX completed without producing a {artifact_kind} artifact.")
     artifact_bytes = output_path.read_bytes()
     if artifact_kind == "glb" and artifact_bytes[:4] != b"glTF":
         raise RuntimeError(f"TRELLIS.2 MLX produced an invalid GLB artifact: {output_path}")
-    if artifact_kind == "safetensors":
+    if artifact_kind in {"safetensors", "sparse_safetensors"}:
         header_size = int.from_bytes(artifact_bytes[:8], byteorder="little", signed=False)
         if header_size <= 2 or header_size > len(artifact_bytes) - 8:
             raise RuntimeError(f"TRELLIS.2 MLX produced an invalid safetensors artifact: {output_path}")
@@ -243,6 +303,8 @@ def run_engine(
             ) from error
         if "cond_512" not in header or "neg_cond_512" not in header:
             raise RuntimeError("Conditioning artifact is missing cond_512 or neg_cond_512 tensors")
+        if artifact_kind == "sparse_safetensors" and "coords_32" not in header:
+            raise RuntimeError("Sparse-structure artifact is missing coords_32")
 
     metrics = {}
     if metrics_path.is_file():

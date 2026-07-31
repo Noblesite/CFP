@@ -76,7 +76,11 @@ The first modular generation-stage workflow ends after native DINOv3 image
 conditioning. It writes a reusable MLX safetensors artifact containing the
 ordered 512-resolution positive and negative conditioning tensors; it does not
 run sparse, shape, texture, or mesh generation. This establishes the typed
-handoff required by the future standalone sparse-generation workflow.
+handoff consumed by the standalone sparse-generation workflow.
+
+The standalone sparse-structure workflow now consumes a promoted conditioning
+artifact by explicit path, validates its CFP schema, samples and decodes the
+32³ occupancy coordinates, and stops before shape or mesh generation.
 
 Native generation nodes are repeat-safe: unchanged queued requests bypass
 ComfyUI artifact caching, the CLI reports explicit execution phases, and the

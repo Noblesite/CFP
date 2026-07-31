@@ -80,6 +80,12 @@ mesh_refined
 mesh_textured
 ```
 
+Any workflow that mutates topology must also render a 3D preview of the exact
+incoming artifact before the first sanitizer, repair, remesh, simplification,
+or other topology-changing node. The preview and the mutating node must consume
+the same source node and output slot. This makes the untouched baseline visible
+without relying on filenames or memory.
+
 ## Review boundary
 
 Successful backend execution means only that an artifact was produced. It does

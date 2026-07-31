@@ -1,0 +1,102 @@
+{
+  "id": "cfp-trellis2-mlx-sparse-structure-v001",
+  "revision": 0,
+  "last_node_id": 4,
+  "last_link_id": 2,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "MarkdownNote",
+      "pos": [-980, -500],
+      "size": [650, 330],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {},
+      "widgets_values": ["# TRELLIS.2 MLX — SPARSE STRUCTURE ONLY\n\nThis workflow consumes one explicitly promoted CFP conditioning artifact.\n\n- Paste the `artifact_path` produced by the Image Conditioning workflow.\n- The loader validates schema and content hash.\n- TRELLIS samples and decodes only the 32³ sparse occupancy coordinates.\n- Shape, texture, mesh extraction, topology sanitation, and GLB export do not run.\n- No 3D preview exists at this stage because the artifact is occupancy coordinates, not a mesh.\n- Automatic promotion is disabled."],
+      "color": "#493b1f",
+      "bgcolor": "#6a5730",
+      "title": "Sparse-Structure Stage Contract"
+    },
+    {
+      "id": 2,
+      "type": "Trellis2MLXModel",
+      "pos": [-900, 20],
+      "size": [420, 154],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {"localized_name": "engine_binary", "name": "engine_binary", "type": "STRING", "widget": {"name": "engine_binary"}, "link": null},
+        {"localized_name": "weights_directory", "name": "weights_directory", "type": "STRING", "widget": {"name": "weights_directory"}, "link": null},
+        {"localized_name": "memory_fraction", "name": "memory_fraction", "type": "FLOAT", "widget": {"name": "memory_fraction"}, "link": null}
+      ],
+      "outputs": [
+        {"localized_name": "mlx_config", "name": "mlx_config", "type": "TRELLIS2_MLX_CONFIG", "links": [1]}
+      ],
+      "properties": {"Node name for S&R": "Trellis2MLXModel", "cnr_id": "comfyui_trellis2_mlx", "ver": "0.18.0"},
+      "widgets_values": ["auto", "auto", 0.95]
+    },
+    {
+      "id": 3,
+      "type": "Trellis2MLXLoadConditioningArtifact",
+      "pos": [-900, 270],
+      "size": [500, 130],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {"localized_name": "artifact_path", "name": "artifact_path", "type": "STRING", "widget": {"name": "artifact_path"}, "link": null}
+      ],
+      "outputs": [
+        {"localized_name": "conditioning", "name": "conditioning", "type": "TRELLIS2_MLX_CONDITIONING", "slot_index": 0, "links": [2]},
+        {"localized_name": "artifact_sha256", "name": "artifact_sha256", "type": "STRING", "slot_index": 1, "links": null},
+        {"localized_name": "status", "name": "status", "type": "STRING", "slot_index": 2, "links": null}
+      ],
+      "properties": {"Node name for S&R": "Trellis2MLXLoadConditioningArtifact", "cnr_id": "comfyui_trellis2_mlx", "ver": "0.18.0"},
+      "widgets_values": ["/path/to/promoted/trellis2_mlx_conditioning.safetensors"]
+    },
+    {
+      "id": 4,
+      "type": "Trellis2MLXSparseStructure",
+      "pos": [-220, 90],
+      "size": [560, 430],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {"localized_name": "mlx_config", "name": "mlx_config", "type": "TRELLIS2_MLX_CONFIG", "link": 1},
+        {"localized_name": "conditioning", "name": "conditioning", "type": "TRELLIS2_MLX_CONDITIONING", "link": 2},
+        {"localized_name": "seed", "name": "seed", "type": "INT", "widget": {"name": "seed"}, "link": null},
+        {"localized_name": "steps", "name": "steps", "type": "INT", "widget": {"name": "steps"}, "link": null}
+      ],
+      "outputs": [
+        {"localized_name": "sparse_structure", "name": "sparse_structure", "type": "TRELLIS2_MLX_SPARSE_STRUCTURE", "slot_index": 0, "links": null},
+        {"localized_name": "artifact_path", "name": "artifact_path", "type": "STRING", "slot_index": 1, "links": null},
+        {"localized_name": "sparse_report", "name": "sparse_report", "type": "STRING", "slot_index": 2, "links": null},
+        {"localized_name": "sparse_report_json", "name": "sparse_report_json", "type": "STRING", "slot_index": 3, "links": null},
+        {"localized_name": "engine_log", "name": "engine_log", "type": "STRING", "slot_index": 4, "links": null},
+        {"localized_name": "artifact_sha256", "name": "artifact_sha256", "type": "STRING", "slot_index": 5, "links": null},
+        {"localized_name": "status", "name": "status", "type": "STRING", "slot_index": 6, "links": null}
+      ],
+      "properties": {"Node name for S&R": "Trellis2MLXSparseStructure", "cnr_id": "comfyui_trellis2_mlx", "ver": "0.18.0"},
+      "widgets_values": [0, "fixed", 12],
+      "color": "#3d2852",
+      "bgcolor": "#553970",
+      "title": "TRELLIS.2 MLX Sparse Structure — Stop Here"
+    }
+  ],
+  "links": [
+    [1, 2, 0, 4, 0, "TRELLIS2_MLX_CONFIG"],
+    [2, 3, 0, 4, 1, "TRELLIS2_MLX_CONDITIONING"]
+  ],
+  "groups": [
+    {"id": 1, "title": "01 — PROMOTED CONDITIONING ARTIFACT", "bounding": [-1010, -540, 720, 980], "color": "#8b6b2f", "font_size": 24, "flags": {}},
+    {"id": 2, "title": "02 — SPARSE STRUCTURE GENERATION", "bounding": [-280, 20, 700, 560], "color": "#6b3d8e", "font_size": 24, "flags": {}}
+  ],
+  "config": {},
+  "extra": {"ds": {"scale": 0.82, "offset": [1140, 620]}},
+  "version": 0.4
+}

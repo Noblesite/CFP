@@ -8,7 +8,9 @@ import pytest
 from comfyui_trellis2_mlx.runner import (
     Trellis2MLXConfig,
     build_environment,
+    build_sparse_environment,
     default_paths,
+    inspect_safetensors,
     run_engine,
 )
 
@@ -197,8 +199,8 @@ def test_generation_nodes_always_rerun_external_engine_artifacts():
         Path(__file__).parents[1] / "comfyui_trellis2_mlx" / "nodes.py"
     ).read_text(encoding="utf-8")
 
-    assert node_source.count("def fingerprint_inputs(cls, **kwargs):") == 3
-    assert node_source.count('return float("nan")') == 3
+    assert node_source.count("def fingerprint_inputs(cls, **kwargs):") == 4
+    assert node_source.count('return float("nan")') == 4
 
 
 def test_conditioning_workflow_stops_before_sparse_or_mesh_generation():
@@ -223,6 +225,90 @@ def test_conditioning_workflow_stops_before_sparse_or_mesh_generation():
         node["type"] in {"Trellis2MLXImageTo3D", "Trellis2MLXMultiViewTo3D", "SaveGLB"}
         for node in workflow["nodes"]
     )
+
+
+def test_sparse_workflow_consumes_explicit_conditioning_and_stops_before_shape():
+    workflow_path = (
+        Path(__file__).parents[1]
+        / "comfyui_trellis2_mlx"
+        / "workflows"
+        / "trellis2_mlx_sparse_structure.json"
+    )
+    workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
+    loader = next(
+        node
+        for node in workflow["nodes"]
+        if node["type"] == "Trellis2MLXLoadConditioningArtifact"
+    )
+    sparse = next(
+        node for node in workflow["nodes"] if node["type"] == "Trellis2MLXSparseStructure"
+    )
+    note = next(node for node in workflow["nodes"] if node["type"] == "MarkdownNote")
+
+    assert loader["widgets_values"] == ["/path/to/promoted/trellis2_mlx_conditioning.safetensors"]
+    assert sparse["widgets_values"] == [0, "fixed", 12]
+    assert sparse["inputs"][1]["link"] == 2
+    assert sparse["outputs"][0]["type"] == "TRELLIS2_MLX_SPARSE_STRUCTURE"
+    assert "explicitly promoted" in note["widgets_values"][0]
+    assert "Shape, texture, mesh extraction" in note["widgets_values"][0]
+    assert not any(
+        node["type"]
+        in {
+            "LoadImage",
+            "Trellis2MLXImageConditioning",
+            "Trellis2MLXImageTo3D",
+            "Trellis2MLXMultiViewTo3D",
+            "Preview3D",
+            "SaveGLB",
+        }
+        for node in workflow["nodes"]
+    )
+
+
+def test_every_sanitizing_workflow_previews_the_exact_untouched_input():
+    workflow_directory = (
+        Path(__file__).parents[1] / "comfyui_trellis2_mlx" / "workflows"
+    )
+    sanitizer_workflows = []
+
+    for workflow_path in workflow_directory.glob("*.json"):
+        workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
+        sanitizer = next(
+            (
+                node
+                for node in workflow["nodes"]
+                if node["type"] == "Trellis2MLXTopologySanitizer"
+            ),
+            None,
+        )
+        if sanitizer is None:
+            continue
+        sanitizer_workflows.append(workflow_path.name)
+        preview = next(
+            node
+            for node in workflow["nodes"]
+            if node.get("title") == "BEFORE SANITIZER — Untouched Incoming Mesh"
+        )
+        sanitizer_input_link = next(
+            link
+            for link in workflow["links"]
+            if link[0] == sanitizer["inputs"][0]["link"]
+        )
+        preview_input_link = next(
+            link for link in workflow["links"] if link[0] == preview["inputs"][0]["link"]
+        )
+
+        assert sanitizer_input_link[1:3] == preview_input_link[1:3]
+        assert sanitizer_input_link[5] == preview_input_link[5] == "FILE_3D_GLB"
+
+    assert set(sanitizer_workflows) == {
+        "trellis2_mlx_background_geometry_guard.json",
+        "trellis2_mlx_post_voxel_polish.json",
+        "trellis2_mlx_print_scale_gate.json",
+        "trellis2_mlx_topology_sanitizer.json",
+        "trellis2_mlx_voxel_remesh_candidate.json",
+        "trellis2_mlx_voxel_resolution_ab.json",
+    }
 
 
 def test_multiview_mask_gated_workflow_checks_each_populated_camera_branch():
@@ -608,7 +694,7 @@ def test_voxel_remesh_workflow_preserves_source_and_reviews_candidate():
 
     assert remesh["widgets_values"] == [192]
     assert remesh["outputs"][0]["links"] == [13, 14, 15, 16]
-    assert {node["title"] for node in previews} == {
+    assert {node["title"] for node in previews} >= {
         "SOURCE — Sanitized Geometry",
         "CANDIDATE — Watertight Voxel Remesh",
     }
@@ -879,6 +965,40 @@ def test_build_environment_configures_conditioning_stage_and_camera_order(tmp_pa
     assert environment["OUT_CONDITIONING"].endswith("conditioning.safetensors")
 
 
+def test_build_sparse_environment_uses_only_promoted_conditioning(tmp_path):
+    config = Trellis2MLXConfig(Path("/engine"), Path("/weights"), 0.95)
+
+    environment = build_sparse_environment(
+        {
+            "IMG": "/stale/input.png",
+            "OUT_GLB": "/stale/output.glb",
+            "VIEW_ANGLES": "0,90",
+            "ADDITIONAL_VIEWS_MANIFEST": "/stale/views.json",
+        },
+        config=config,
+        conditioning_path=tmp_path / "conditioning.safetensors",
+        output_path=tmp_path / "sparse.safetensors",
+        metrics_path=tmp_path / "sparse.json",
+        seed=93,
+        steps=12,
+    )
+
+    assert environment["ENGINE_STAGE"] == "sparse"
+    assert environment["IN_CONDITIONING"].endswith("conditioning.safetensors")
+    assert environment["OUT_SPARSE"].endswith("sparse.safetensors")
+    assert environment["SEED"] == "93"
+    assert environment["STEPS"] == "12"
+    assert environment["MATTING"] == "off"
+    assert environment["TEXTURE"] == "off"
+    assert not {
+        "IMG",
+        "OUT_GLB",
+        "OUT_CONDITIONING",
+        "VIEW_ANGLES",
+        "ADDITIONAL_VIEWS_MANIFEST",
+    } & environment.keys()
+
+
 def test_build_environment_rejects_unknown_output_mode(tmp_path):
     config = Trellis2MLXConfig(Path("/engine"), Path("/weights"), 0.95)
 
@@ -1002,6 +1122,61 @@ print("fake conditioning complete")
     assert metrics["artifact_kind"] == "safetensors"
     assert len(metrics["artifact_sha256"]) == 64
     assert log_text == "fake conditioning complete"
+
+
+def test_run_engine_accepts_sparse_structure_safetensors(tmp_path):
+    config = make_fake_config(
+        tmp_path,
+        """#!/usr/bin/env python3
+import json
+import os
+
+header = {
+    "__metadata__": {"schema": "cfp.trellis2-mlx-sparse-structure.v1"},
+    "cond_512": {"dtype": "F32", "shape": [1, 2, 3], "data_offsets": [0, 24]},
+    "neg_cond_512": {"dtype": "F32", "shape": [1, 2, 3], "data_offsets": [24, 48]},
+    "coords_32": {"dtype": "I32", "shape": [2, 4], "data_offsets": [48, 80]},
+}
+encoded = json.dumps(header).encode("utf-8")
+with open(os.environ["OUT_SPARSE"], "wb") as artifact:
+    artifact.write(len(encoded).to_bytes(8, "little"))
+    artifact.write(encoded)
+    artifact.write(bytes(80))
+with open(os.environ["METRICS_JSON"], "w", encoding="utf-8") as report:
+    json.dump({"status": "SPARSE_STRUCTURE_READY", "voxel_count": 2}, report)
+print("fake sparse complete")
+""",
+    )
+    output_path = tmp_path / "sparse.safetensors"
+    metrics_path = tmp_path / "sparse.json"
+    environment = build_sparse_environment(
+        os.environ,
+        config=config,
+        conditioning_path=tmp_path / "conditioning.safetensors",
+        output_path=output_path,
+        metrics_path=metrics_path,
+        seed=93,
+        steps=12,
+    )
+
+    metrics, log_text = run_engine(
+        config=config,
+        environment=environment,
+        output_path=output_path,
+        metrics_path=metrics_path,
+        on_log=lambda _: None,
+        check_cancelled=lambda: None,
+        artifact_kind="sparse_safetensors",
+    )
+    header, artifact_sha256 = inspect_safetensors(output_path)
+
+    assert metrics["status"] == "SPARSE_STRUCTURE_READY"
+    assert metrics["voxel_count"] == 2
+    assert metrics["artifact_kind"] == "sparse_safetensors"
+    assert header["__metadata__"]["schema"] == "cfp.trellis2-mlx-sparse-structure.v1"
+    assert "coords_32" in header
+    assert artifact_sha256 == metrics["artifact_sha256"]
+    assert log_text == "fake sparse complete"
 
 
 def test_run_engine_terminates_subprocess_when_cancelled(tmp_path):

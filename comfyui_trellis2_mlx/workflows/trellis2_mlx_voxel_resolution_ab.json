@@ -1,8 +1,8 @@
 {
   "id": "cfp-trellis2-mlx-voxel-resolution-ab-v001",
   "revision": 0,
-  "last_node_id": 24,
-  "last_link_id": 25,
+  "last_node_id": 25,
+  "last_link_id": 26,
   "nodes": [
     {
       "id": 1,
@@ -88,7 +88,7 @@
         {"localized_name": "min_component_ratio", "name": "min_component_ratio", "type": "FLOAT", "widget": {"name": "min_component_ratio"}, "link": null}
       ],
       "outputs": [
-        {"localized_name": "model_3d", "name": "model_3d", "type": "FILE_3D_GLB", "slot_index": 0, "links": [6, 7]},
+        {"localized_name": "model_3d", "name": "model_3d", "type": "FILE_3D_GLB", "slot_index": 0, "links": [6, 7, 26]},
         {"localized_name": "cleanup_report", "name": "cleanup_report", "type": "STRING", "slot_index": 1, "links": null},
         {"localized_name": "cleanup_report_json", "name": "cleanup_report_json", "type": "STRING", "slot_index": 2, "links": null},
         {"localized_name": "status", "name": "status", "type": "STRING", "slot_index": 3, "links": null}
@@ -458,6 +458,22 @@
       ],
       "properties": {"Node name for S&R": "Trellis2MLXVoxelCandidateComparison"},
       "widgets_values": ["", "", ""]
+    },
+    {
+      "id": 25,
+      "type": "Preview3D",
+      "title": "BEFORE SANITIZER — Untouched Incoming Mesh",
+      "pos": [920, -150],
+      "size": [500, 360],
+      "flags": {},
+      "order": 21,
+      "mode": 0,
+      "inputs": [
+        {"localized_name": "model_file", "name": "model_file", "type": "FILE_3D_GLB", "link": 26}
+      ],
+      "outputs": [],
+      "properties": {"cnr_id": "comfy-core", "ver": "0.5.1", "Node name for S&R": "Preview3D"},
+      "widgets_values": []
     }
   ],
   "links": [
@@ -483,7 +499,8 @@
     [22, 21, 0, 23, 0, "FILE_3D_GLB"],
     [23, 17, 2, 24, 0, "STRING"],
     [24, 12, 2, 24, 1, "STRING"],
-    [25, 21, 2, 24, 2, "STRING"]
+    [25, 21, 2, 24, 2, "STRING"],
+    [26, 4, 0, 25, 0, "FILE_3D_GLB"]
   ],
   "groups": [
     {"id": 1, "title": "01 — IMAGE INPUT", "bounding": [-800, 20, 400, 400], "color": "#3f789e", "font_size": 24, "flags": {}},

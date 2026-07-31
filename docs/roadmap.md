@@ -35,12 +35,20 @@ Completed reliability gate:
 - engine phase output and Python startup/stall watchdogs prevent indefinite jobs;
 - two consecutive real matting-enabled MLX generations are verified.
 
+Completed modular generation stages:
+
+- native DINOv3 conditioning exports a reviewable safetensors artifact;
+- standalone sparse-structure generation consumes only an explicit promoted
+  conditioning artifact and stops after 32-cubed occupancy decoding;
+- any workflow that sanitizes topology previews the exact untouched incoming
+  mesh before mutation.
+
 Pinned next slice:
 
-1. Consume the promoted `TRELLIS2_MLX_CONDITIONING` artifact in a standalone
-   sparse-structure generation node and single-purpose workflow.
-2. Preserve the current conditioning artifact as an explicit, human-reviewed
-   boundary; do not silently chain through shape, texture, or mesh generation.
+1. Consume the promoted `TRELLIS2_MLX_SPARSE_STRUCTURE` artifact in a standalone
+   shape-SLat generation node and single-purpose workflow.
+2. Stop before shape decoding, texture generation, or mesh construction; retain
+   the explicit human-review boundary.
 
 ## Later pipeline stages
 
