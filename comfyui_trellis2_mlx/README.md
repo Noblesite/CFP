@@ -23,6 +23,18 @@ memory-budget and deterministic-seed CLI patch before building.
 The node unloads cached ComfyUI models before starting Swift because both
 runtimes share unified memory.
 
+Generation and conditioning nodes deliberately opt out of ComfyUI result
+caching. Queueing an unchanged workflow therefore launches a fresh native
+engine process and materializes a new artifact, even with a fixed seed. The
+wrapper also enforces startup and phase-stall timeouts; Swift emits named phase
+changes and informational heartbeats so a wedged subprocess is terminated
+instead of leaving the ComfyUI job active indefinitely.
+
+Native BiRefNet matting runs as a separate pre-TRELLIS phase. The matted RGBA
+views are produced first, BiRefNet is evicted, and only then is TRELLIS
+registered. This avoids a re-entrant MLX engine call and permits consecutive
+`matting=on` generations in the same ComfyUI session.
+
 `TRELLIS.2 MLX Image Conditioning` is the first modular native-engine stage.
 It accepts approved 000°, 090°, 180°, and 270° views, preprocesses and encodes
 each view independently with DINOv3, concatenates the ordered token sequences,

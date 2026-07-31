@@ -327,6 +327,29 @@ index fdc4283..df8da59 100644
 +        return (generated, hrResolution, metrics)
      }
  }
+diff --git a/Sources/Trellis2Kit/ImagePreprocess.swift b/Sources/Trellis2Kit/ImagePreprocess.swift
+index 6ac180a..470262a 100644
+--- a/Sources/Trellis2Kit/ImagePreprocess.swift
++++ b/Sources/Trellis2Kit/ImagePreprocess.swift
+@@ -16,6 +16,18 @@ import UniformTypeIdentifiers
+ /// artifacts, so the package still carries no cross-package ModelPackage dependency (C13). With no
+ /// hook and no usable alpha we fall back to a full-frame resize (the background then leaks into the
+ /// mesh).
++/// Public preprocessing seam for hosts that coordinate matting as a separate engine phase.
++/// Running the matter before TRELLIS registration avoids re-entering `MLXServeEngine.run` from
++/// inside an active image-to-3D request while preserving TRELLIS.2's canonical alpha behavior.
++public enum Trellis2ImagePreparation {
++    public static func mattedIfNeeded(
++        _ image: Image,
++        using matter: Trellis2Matting
++    ) async throws -> Image {
++        try await ImagePreprocess.mattedIfNeeded(image, using: matter)
++    }
++}
++
+ enum ImagePreprocess {
+     static let size = 512
+     static let maxSide = 1024
 diff --git a/Sources/Trellis2Kit/Trellis2Package.swift b/Sources/Trellis2Kit/Trellis2Package.swift
 index 0e8c55e..a98209b 100644
 --- a/Sources/Trellis2Kit/Trellis2Package.swift
@@ -583,10 +606,10 @@ index 91d0c65..55f681c 100644
 -print("GENERATE DONE \(tier.rawValue)@\(hrRes) \(baked.faces.dim(0)) faces \(String(format: "%.0f", -t0.timeIntervalSinceNow))s peakphys \(String(format: "%.2f", peakPhys))GB")
 +print("GENERATE DONE \(tier.rawValue)@\(hrRes) \(generated.faces.dim(0)) faces \(String(format: "%.0f", -t0.timeIntervalSinceNow))s peakphys \(String(format: "%.2f", peakPhys))GB")
 diff --git a/Sources/trellis2-run-engine/main.swift b/Sources/trellis2-run-engine/main.swift
-index 072af6d..cd78f72 100644
+index 072af6d..a72738b 100644
 --- a/Sources/trellis2-run-engine/main.swift
 +++ b/Sources/trellis2-run-engine/main.swift
-@@ -17,9 +17,23 @@ import Trellis2Kit
+@@ -17,13 +17,53 @@ import Trellis2Kit
  //
  // Env:
  //   IMG          input PNG/JPEG (required)
@@ -610,7 +633,37 @@ index 072af6d..cd78f72 100644
 
  setvbuf(stdout, nil, _IONBF, 0)
  func gb(_ bytes: UInt64) -> String { String(format: "%.2f GB", Double(bytes) / 1e9) }
-@@ -43,18 +57,73 @@ physTimer.resume()
+
++final class EngineProgress: @unchecked Sendable {
++    private let lock = NSLock()
++    private var phase = "startup"
++    private let started = Date()
++
++    func update(_ value: String) {
++        lock.lock()
++        phase = value
++        lock.unlock()
++        print("[engine] phase=\(value)")
++    }
++
++    func heartbeat() {
++        lock.lock()
++        let current = phase
++        lock.unlock()
++        print(String(format: "[engine] heartbeat phase=%@ elapsed=%.0fs", current, -started.timeIntervalSinceNow))
++    }
++}
++
++let progress = EngineProgress()
++let heartbeatTimer = DispatchSource.makeTimerSource(queue: DispatchQueue(label: "engine-heartbeat"))
++heartbeatTimer.schedule(deadline: .now() + .seconds(10), repeating: .seconds(15))
++heartbeatTimer.setEventHandler { progress.heartbeat() }
++heartbeatTimer.resume()
++
+ // phys_footprint peak sampler — the admission-basis measurement (manifest re-baseline).
+ func physFootprintGB() -> Double {
+     var info = task_vm_info_data_t()
+@@ -43,18 +83,73 @@ physTimer.resume()
 
  let env = ProcessInfo.processInfo.environment
  let here = FileManager.default.currentDirectoryPath
@@ -625,7 +678,7 @@ index 072af6d..cd78f72 100644
 +    return Image(format: format, data: data)
 +}
 +guard let imgPath = env["IMG"] else { fatalError("set IMG=<png/jpeg> to a readable input image") }
-+let image = loadInputImage(path: imgPath)
++var image = loadInputImage(path: imgPath)
 +var additionalViewPaths: [String] = []
 +if let manifestPath = env["ADDITIONAL_VIEWS_MANIFEST"] {
 +    guard let data = FileManager.default.contents(atPath: manifestPath),
@@ -634,7 +687,7 @@ index 072af6d..cd78f72 100644
 +    }
 +    additionalViewPaths = decoded
  }
-+let additionalViews = additionalViewPaths.map { loadInputImage(path: $0) }
++var additionalViews = additionalViewPaths.map { loadInputImage(path: $0) }
  let outGLB = env["OUT_GLB"] ?? "\(here)/out_mesh_engine.glb"
 -let fmt: Image.Format = imgPath.lowercased().hasSuffix(".jpg") || imgPath.lowercased().hasSuffix(".jpeg") ? .jpeg : .png
 -let image = Image(format: fmt, data: pngData)
@@ -690,7 +743,7 @@ index 072af6d..cd78f72 100644
  print("[engine] device budget: \(gb(await engine.memory.budgetBytes)) | available \(gb(await engine.memory.availableBytes))")
 
  do {
-@@ -70,6 +139,18 @@ do {
+@@ -70,41 +165,65 @@ do {
      if let v = env["TEX_SDPA"] { print("[engine] tex SDPA: \(v)") }
      let steps = env["STEPS"].flatMap { Int($0) } ?? 12
      if steps != 12 { print("[engine] sampler steps: \(steps)") }
@@ -709,7 +762,55 @@ index 072af6d..cd78f72 100644
      // CFG-cost experiment knobs (shape SLat flows): interval "lo,hi" + vNeg cache stride.
      if let v = env["SLAT_CFG_INTERVAL"] { print("[engine] slat CFG interval: \(v)") }
      if let v = env["SLAT_NEG_EVERY"] { print("[engine] slat CFG neg-every: \(v)") }
-@@ -105,6 +186,8 @@ do {
+     if let v = env["MAX_HR_TOKENS"] { print("[engine] HR token cap override: \(v)") }
+
+-    // Foreground matting hook (T0.4), composed the way the app does it: BiRefNet registered as a
+-    // second package, prepared, and injected as the Trellis2Matting closure. Default ON — raw
+-    // (no-usable-alpha) inputs otherwise leak background slabs/color shifts into the mesh
+-    // (BENCHMARKS.md corpus validation). MATTING=off restores the old raw-input behavior.
+-    // Pre-matted RGBA inputs skip the hook per upstream has_alpha, so leaving it on is free there.
+-    var matting: Trellis2Matting? = nil
+-    var mattePkgID: PackageID? = nil
++    // Run foreground matting as its own engine phase before TRELLIS starts. Injecting a matting
++    // closure into TRELLIS caused a nested `engine.run` while imageTo3D was already active, which
++    // can deadlock the coordinator. Pre-matting produces the same canonical RGBA input without
++    // re-entering the engine.
+     if env["MATTING"]?.lowercased() != "off" {
++        progress.update("matting_prepare")
+         let modelsRoot = env["MODELS_ROOT"].map { URL(fileURLWithPath: $0) }
+             ?? FileManager.default.homeDirectoryForCurrentUser.appending(path: "Development/MLXModelStore")
+         let matteID = try await engine.register(BiRefNetPackage.registration,
+                                                 configuration: BiRefNetConfiguration(modelsRootDirectory: modelsRoot))
+-        mattePkgID = matteID
+         let tMat = Date()
+         _ = try await engine.prepare(.matting, package: matteID)
+         print(String(format: "[engine] matting: BiRefNet prepared in %.1fs (MATTING=off to disable)",
+                      -tMat.timeIntervalSinceNow))
+-        matting = { image in
+-            let resp = try await engine.run(MattingRequest(image: image), package: matteID)
++        let matter: Trellis2Matting = { input in
++            let resp = try await engine.run(MattingRequest(image: input), package: matteID)
+             guard let m = resp as? MattingResponse else { fatalError("unexpected matting response \(type(of: resp))") }
+             return m.matte
+         }
++        progress.update("matting_run")
++        image = try await Trellis2ImagePreparation.mattedIfNeeded(image, using: matter)
++        for index in additionalViews.indices {
++            additionalViews[index] = try await Trellis2ImagePreparation.mattedIfNeeded(
++                additionalViews[index],
++                using: matter
++            )
++        }
++        progress.update("matting_evict")
++        await engine.evict(.matting, package: matteID)
++        engine.trimCaches()
++        print("[engine] matting: prepared \(1 + additionalViews.count) RGBA view(s) and evicted BiRefNet")
+     } else {
+         print("[engine] matting: OFF (raw inputs — background may leak into the mesh)")
+     }
+
++    progress.update("trellis_register")
+     let pkgID = try await engine.register(Trellis2Package.registration,
                                            configuration: Trellis2Configuration(
                                                weightsRootOverride: weightsOverride,
                                                steps: steps,
@@ -718,7 +819,20 @@ index 072af6d..cd78f72 100644
                                                unwrapBackend: env["UNWRAP_BACKEND"],
                                                metricsPath: metricsPath,
                                                slatCfgAttention: env["HR_SDPA"],
-@@ -128,16 +211,44 @@ do {
+@@ -112,10 +231,11 @@ do {
+                                               slatCfgInterval: env["SLAT_CFG_INTERVAL"],
+                                               slatCfgNegEvery: env["SLAT_NEG_EVERY"].flatMap { Int($0) },
+                                               maxHRTokens: env["MAX_HR_TOKENS"].flatMap { Int($0) },
+-                                              matting: matting))
++                                              matting: nil))
+     print("[engine] registered packageID=\(pkgID) | backers(imageTo3D)=\(await engine.packages(for: .imageTo3D))")
+
+     let tLoad = Date()
++    progress.update("trellis_prepare")
+     _ = try await engine.prepare(.imageTo3D, package: pkgID)
+     let afterLoad = await engine.memory
+     print(String(format: "[engine] prepare OK in %.1fs | charged %@ | resident %@ / budget %@",
+@@ -128,16 +248,47 @@ do {
      print("[engine] tier: \(mode.rawValue)")
 
      let tRun = Date()
@@ -730,6 +844,7 @@ index 072af6d..cd78f72 100644
 -                 -tRun.timeIntervalSinceNow, Double(GPU.peakMemory)/1e9, peakPhys))
 -    print("[engine] mesh: verts=\(resp.mesh.vertexCount ?? -1) faces=\(resp.mesh.faceCount ?? -1) "
 -        + "vertexColors=\(resp.mesh.hasVertexColors) bytes=\(resp.mesh.data.count)")
++    progress.update(engineStage == "conditioning" ? "conditioning_run" : "trellis_run")
 +    if engineStage == "conditioning" {
 +        let response = try await engine.run(
 +            Trellis2ConditioningRequest(
@@ -743,6 +858,7 @@ index 072af6d..cd78f72 100644
 +        guard let resp = response as? Trellis2ConditioningResponse else {
 +            fatalError("unexpected conditioning response \(type(of: response))")
 +        }
++        progress.update("write_artifact")
 +        try resp.artifact.write(to: URL(fileURLWithPath: outConditioning))
 +        try resp.reportJSON.write(to: URL(fileURLWithPath: metricsPath))
 +        print(String(format: "[engine] conditioning OK in %.1fs | GPU peak %.2f GB | peak phys %.2f GB",
@@ -760,6 +876,7 @@ index 072af6d..cd78f72 100644
 +        guard let resp = response as? ImageTo3DResponse else {
 +            fatalError("unexpected response \(type(of: response))")
 +        }
++        progress.update("write_artifact")
 +        try resp.mesh.data.write(to: URL(fileURLWithPath: outGLB))
 +        print(String(format: "[engine] run OK in %.0fs | GPU peak %.2f GB | peak phys %.2f GB",
 +                     -tRun.timeIntervalSinceNow, Double(GPU.peakMemory)/1e9, peakPhys))
@@ -772,3 +889,22 @@ index 072af6d..cd78f72 100644
 
      // Dump the stage-timing profile (the point of this harness): stages sorted by cost,
      // each with its share of the end-to-end wall clock. Measure before optimizing.
+@@ -157,11 +308,17 @@ do {
+         print("[engine] no metrics record at \(metricsPath)")
+     }
+
++    progress.update("trellis_evict")
+     await engine.evict(.imageTo3D, package: pkgID)
+-    if let m = mattePkgID { await engine.evict(.matting, package: m) }
+     print("[engine] evicted. resident now \(gb(await engine.memory.residentBytes))")
++    progress.update("completed")
++    heartbeatTimer.cancel()
++    physTimer.cancel()
+     print("================ DONE — engine path validated ================")
+ } catch {
++    progress.update("failed")
++    heartbeatTimer.cancel()
++    physTimer.cancel()
+     print("[engine] FAILED: \(error)")
+     exit(1)
+ }

@@ -26,6 +26,22 @@
 7. Add a small project manifest after documenting JSON, TOML, and YAML
    tradeoffs.
 
+## Native TRELLIS.2 MLX track
+
+Completed reliability gate:
+
+- identical queued generation and conditioning requests always execute;
+- native BiRefNet matting completes before TRELLIS registration;
+- engine phase output and Python startup/stall watchdogs prevent indefinite jobs;
+- two consecutive real matting-enabled MLX generations are verified.
+
+Pinned next slice:
+
+1. Consume the promoted `TRELLIS2_MLX_CONDITIONING` artifact in a standalone
+   sparse-structure generation node and single-purpose workflow.
+2. Preserve the current conditioning artifact as an explicit, human-reviewed
+   boundary; do not silently chain through shape, texture, or mesh generation.
+
 ## Later pipeline stages
 
 ```text

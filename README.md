@@ -78,6 +78,12 @@ ordered 512-resolution positive and negative conditioning tensors; it does not
 run sparse, shape, texture, or mesh generation. This establishes the typed
 handoff required by the future standalone sparse-generation workflow.
 
+Native generation nodes are repeat-safe: unchanged queued requests bypass
+ComfyUI artifact caching, the CLI reports explicit execution phases, and the
+Python wrapper terminates startup or phase stalls. BiRefNet now completes and
+evicts before TRELLIS starts, avoiding the nested engine call that previously
+could leave a second run waiting forever.
+
 The four-view workbench extends that baseline with the complete 270° right-side
 camera branch. This keeps the three-view workflow available for comparison
 while providing a fixed 000°, 090°, 180°, 270° cardinal model sheet.

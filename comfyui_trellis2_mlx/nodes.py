@@ -742,6 +742,12 @@ class Trellis2MLXModel(IO.ComfyNode):
 
 class Trellis2MLXImageConditioning(IO.ComfyNode):
     @classmethod
+    def fingerprint_inputs(cls, **kwargs):
+        # This node launches an external process and materializes a new artifact. Never let
+        # ComfyUI reuse an earlier filesystem result merely because the visible inputs match.
+        return float("nan")
+
+    @classmethod
     def define_schema(cls):
         return IO.Schema(
             node_id="Trellis2MLXImageConditioning",
@@ -805,6 +811,10 @@ class Trellis2MLXImageConditioning(IO.ComfyNode):
 
 
 class Trellis2MLXImageTo3D(IO.ComfyNode):
+    @classmethod
+    def fingerprint_inputs(cls, **kwargs):
+        return float("nan")
+
     @classmethod
     def define_schema(cls):
         return IO.Schema(
@@ -873,6 +883,10 @@ class Trellis2MLXImageTo3D(IO.ComfyNode):
 
 
 class Trellis2MLXMultiViewTo3D(IO.ComfyNode):
+    @classmethod
+    def fingerprint_inputs(cls, **kwargs):
+        return float("nan")
+
     @classmethod
     def define_schema(cls):
         return IO.Schema(

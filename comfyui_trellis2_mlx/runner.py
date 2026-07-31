@@ -20,6 +20,8 @@ class Trellis2MLXConfig:
     engine_binary: Path
     weights_directory: Path
     memory_fraction: float = 0.95
+    startup_timeout_seconds: float = 60.0
+    stall_timeout_seconds: float = 900.0
 
     def validate(self) -> None:
         if os.uname().sysname != "Darwin" or os.uname().machine != "arm64":
@@ -57,6 +59,10 @@ class Trellis2MLXConfig:
             )
         if not 0.70 <= self.memory_fraction <= 0.98:
             raise ValueError("memory_fraction must be between 0.70 and 0.98")
+        if self.startup_timeout_seconds <= 0:
+            raise ValueError("startup_timeout_seconds must be greater than zero")
+        if self.stall_timeout_seconds <= 0:
+            raise ValueError("stall_timeout_seconds must be greater than zero")
 
 
 @dataclass(frozen=True)
@@ -163,26 +169,52 @@ def run_engine(
     selector = selectors.DefaultSelector()
     selector.register(process.stdout, selectors.EVENT_READ)
     lines: list[str] = []
-    try:
-        while process.poll() is None:
-            check_cancelled()
-            for key, _ in selector.select(timeout=0.25):
-                line = key.fileobj.readline()
-                if line:
-                    clean = line.rstrip()
-                    lines.append(clean)
-                    on_log(clean)
-        for line in process.stdout:
-            clean = line.rstrip()
-            lines.append(clean)
-            on_log(clean)
-    except BaseException:
+    started_at = time.monotonic()
+    last_progress_at = started_at
+    received_output = False
+
+    def stop_process() -> None:
+        if process.poll() is not None:
+            return
         process.terminate()
         try:
             process.wait(timeout=5)
         except subprocess.TimeoutExpired:
             process.kill()
             process.wait()
+
+    try:
+        while process.poll() is None:
+            check_cancelled()
+            events = selector.select(timeout=0.25)
+            for key, _ in events:
+                line = key.fileobj.readline()
+                if line:
+                    clean = line.rstrip()
+                    lines.append(clean)
+                    on_log(clean)
+                    received_output = True
+                    if not clean.startswith("[engine] heartbeat"):
+                        last_progress_at = time.monotonic()
+            now = time.monotonic()
+            if not received_output and now - started_at > config.startup_timeout_seconds:
+                stop_process()
+                raise RuntimeError(
+                    "TRELLIS.2 MLX engine produced no startup output for "
+                    f"{config.startup_timeout_seconds:.1f} seconds and was terminated."
+                )
+            if received_output and now - last_progress_at > config.stall_timeout_seconds:
+                stop_process()
+                raise RuntimeError(
+                    "TRELLIS.2 MLX engine made no phase progress for "
+                    f"{config.stall_timeout_seconds:.1f} seconds and was terminated."
+                )
+        for line in process.stdout:
+            clean = line.rstrip()
+            lines.append(clean)
+            on_log(clean)
+    except BaseException:
+        stop_process()
         raise
     finally:
         selector.close()

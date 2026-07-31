@@ -187,6 +187,18 @@ def test_multiview_workflow_uses_three_separate_ordered_views():
     assert "Trellis2ConditioningRequest" in patch_text
     assert "MLX.saveToData(arrays: arrays" in patch_text
     assert 'engineStage == "conditioning"' in patch_text
+    assert "Trellis2ImagePreparation.mattedIfNeeded" in patch_text
+    assert 'progress.update("matting_evict")' in patch_text
+    assert "engine.trimCaches()" in patch_text
+
+
+def test_generation_nodes_always_rerun_external_engine_artifacts():
+    node_source = (
+        Path(__file__).parents[1] / "comfyui_trellis2_mlx" / "nodes.py"
+    ).read_text(encoding="utf-8")
+
+    assert node_source.count("def fingerprint_inputs(cls, **kwargs):") == 3
+    assert node_source.count('return float("nan")') == 3
 
 
 def test_conditioning_workflow_stops_before_sparse_or_mesh_generation():
@@ -1021,3 +1033,81 @@ sleep 10
         )
 
     assert time.monotonic() - started < 3
+
+
+def test_run_engine_terminates_when_startup_produces_no_output(tmp_path):
+    base = make_fake_config(tmp_path, "#!/bin/sh\nsleep 10\n")
+    config = Trellis2MLXConfig(
+        base.engine_binary,
+        base.weights_directory,
+        base.memory_fraction,
+        startup_timeout_seconds=0.05,
+        stall_timeout_seconds=1.0,
+    )
+
+    started = time.monotonic()
+    with pytest.raises(RuntimeError, match="no startup output"):
+        run_engine(
+            config=config,
+            environment=os.environ.copy(),
+            output_path=tmp_path / "output.glb",
+            metrics_path=tmp_path / "metrics.json",
+            on_log=lambda _: None,
+            check_cancelled=lambda: None,
+        )
+
+    assert time.monotonic() - started < 3
+
+
+def test_run_engine_terminates_when_phase_stalls(tmp_path):
+    base = make_fake_config(
+        tmp_path,
+        "#!/bin/sh\nprintf '[engine] phase=trellis_run\\n'\nsleep 10\n",
+    )
+    config = Trellis2MLXConfig(
+        base.engine_binary,
+        base.weights_directory,
+        base.memory_fraction,
+        startup_timeout_seconds=1.0,
+        stall_timeout_seconds=0.05,
+    )
+
+    with pytest.raises(RuntimeError, match="no phase progress"):
+        run_engine(
+            config=config,
+            environment=os.environ.copy(),
+            output_path=tmp_path / "output.glb",
+            metrics_path=tmp_path / "metrics.json",
+            on_log=lambda _: None,
+            check_cancelled=lambda: None,
+        )
+
+
+def test_engine_heartbeat_does_not_hide_a_stalled_phase(tmp_path):
+    base = make_fake_config(
+        tmp_path,
+        """#!/bin/sh
+printf '[engine] phase=trellis_run\n'
+while true; do
+  printf '[engine] heartbeat phase=trellis_run elapsed=15s\n'
+  sleep 0.02
+done
+""",
+    )
+    config = Trellis2MLXConfig(
+        base.engine_binary,
+        base.weights_directory,
+        base.memory_fraction,
+        startup_timeout_seconds=1.0,
+        stall_timeout_seconds=0.08,
+    )
+
+    with pytest.raises(RuntimeError, match="no phase progress"):
+        run_engine(
+            config=config,
+            environment=os.environ.copy(),
+            output_path=tmp_path / "output.glb",
+            metrics_path=tmp_path / "metrics.json",
+            on_log=lambda _: None,
+            check_cancelled=lambda: None,
+        )
