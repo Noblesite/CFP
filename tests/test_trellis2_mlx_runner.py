@@ -112,6 +112,82 @@ def test_input_mask_quality_workflow_gates_rmbg_alpha_before_inference():
     assert gate["outputs"][1]["links"] == [8]
 
 
+def test_single_image_manufacturing_workflow_wraps_complete_refinement_lane():
+    workflow_path = (
+        Path(__file__).parents[1]
+        / "comfyui_trellis2_mlx"
+        / "workflows"
+        / "trellis2_mlx_single_image_manufacturing.json"
+    )
+    workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
+    nodes = {node["id"]: node for node in workflow["nodes"]}
+    links = {link[0]: link for link in workflow["links"]}
+
+    def node(node_type, title=None):
+        return next(
+            candidate
+            for candidate in workflow["nodes"]
+            if candidate["type"] == node_type
+            and (title is None or candidate.get("title") == title)
+        )
+
+    def source_for(target_node, input_name):
+        target_input = next(
+            item for item in target_node["inputs"] if item["name"] == input_name
+        )
+        link = links[target_input["link"]]
+        return nodes[link[1]], link[2], link[5]
+
+    rmbg = node("RMBG")
+    mask_gate = node("Trellis2MLXInputMaskQualityGate")
+    generator = node("Trellis2MLXImageTo3D")
+    raw_preview = node("Preview3D", "RAW TRELLIS — Untouched Generated Mesh")
+    raw_save = node("SaveGLB", "Save RAW TRELLIS Artifact")
+    remove_floaters = node("Trellis2MLXRemoveFloaters")
+    before_sanitizer = node(
+        "Preview3D", "BEFORE SANITIZER — Untouched Incoming Mesh"
+    )
+    sanitizer = node("Trellis2MLXTopologySanitizer")
+    background_guard = node("Trellis2MLXBackgroundGeometryGuard")
+    voxel = node("Trellis2MLXVoxelRemeshCandidate")
+    polish = node("Trellis2MLXPostVoxelTopologyPolish")
+    scale = node("Trellis2MLXPrintScaleFeatureGate")
+    final_preview = node("Preview3D", "FINAL 250 mm — Print Preview")
+    final_save = node("SaveGLB", "Save FINAL 250 mm Candidate")
+    contract = node("MarkdownNote", "Single-Image Manufacturing Flow Contract")
+
+    assert len(rmbg["properties"]["models"]) == 4
+    assert source_for(mask_gate, "image")[0] is rmbg
+    assert source_for(generator, "image")[0] is mask_gate
+    assert source_for(generator, "mask")[0] is mask_gate
+    assert generator["widgets_values"] == [0, "fixed", 12, "geometry_only", "off"]
+
+    assert source_for(raw_preview, "model_file")[0] is generator
+    assert source_for(raw_save, "mesh")[0] is generator
+    assert raw_save["widgets_values"][0] == "CFP/TRELLIS2_MLX_SINGLE_IMAGE_RAW"
+
+    assert source_for(remove_floaters, "model_3d")[0] is generator
+    assert source_for(before_sanitizer, "model_file")[0] is remove_floaters
+    assert source_for(sanitizer, "model_3d")[0] is remove_floaters
+    assert source_for(background_guard, "model_3d")[0] is sanitizer
+    assert source_for(voxel, "model_3d")[0] is background_guard
+    assert source_for(polish, "candidate_3d")[0] is voxel
+    assert source_for(scale, "model_3d")[0] is polish
+    assert source_for(final_preview, "model_file")[0] is scale
+    assert source_for(final_save, "mesh")[0] is scale
+
+    assert voxel["widgets_values"] == [256]
+    assert scale["widgets_values"] == [250.0, "z", 256, 0.4, 0.2]
+    assert final_save["widgets_values"][0] == (
+        "CFP/TRELLIS2_MLX_SINGLE_IMAGE_FINAL_250MM"
+    )
+    assert "No stage overwrites the raw TRELLIS artifact" in contract["widgets_values"][0]
+    assert not any(
+        candidate["type"] == "Trellis2MLXMultiViewTo3D"
+        for candidate in workflow["nodes"]
+    )
+
+
 @pytest.mark.parametrize(
     "workflow_name",
     [
@@ -305,6 +381,7 @@ def test_every_sanitizing_workflow_previews_the_exact_untouched_input():
         "trellis2_mlx_background_geometry_guard.json",
         "trellis2_mlx_post_voxel_polish.json",
         "trellis2_mlx_print_scale_gate.json",
+        "trellis2_mlx_single_image_manufacturing.json",
         "trellis2_mlx_topology_sanitizer.json",
         "trellis2_mlx_voxel_remesh_candidate.json",
         "trellis2_mlx_voxel_resolution_ab.json",

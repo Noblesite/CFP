@@ -43,12 +43,37 @@ Completed modular generation stages:
 - any workflow that sanitizes topology previews the exact untouched incoming
   mesh before mutation.
 
+Completed integrated workbench:
+
+- the single-image manufacturing workflow combines RMBG, input-mask gating,
+  geometry-only TRELLIS reconstruction, immutable raw review/export, floater
+  filtering, sanitation, background-geometry protection, 256-cell voxel
+  refinement, conservative polish, print scaling, final review, and export;
+- the voxel-resolution A/B experiment remains separate so the production lane
+  has one deterministic refinement path.
+
+Requested workflow set:
+
+1. Character turnaround-sheet generation — existing CFP image workbench,
+   consolidation still pending.
+2. Part isolation from an approved turnaround — existing CFP/Flux MLX work,
+   consolidation remains outside the TRELLIS node track.
+3. Single image to refined mesh — integrated workflow implemented.
+4. Multiple aligned images to refined mesh — next integrated workflow after
+   the single-image graph is validated in ComfyUI.
+
 Pinned next slice:
 
-1. Consume the promoted `TRELLIS2_MLX_SPARSE_STRUCTURE` artifact in a standalone
-   shape-SLat generation node and single-purpose workflow.
-2. Stop before shape decoding, texture generation, or mesh construction; retain
-   the explicit human-review boundary.
+1. Run and inspect the integrated single-image workbench in ComfyUI, preserving
+   the raw and final artifacts for comparison.
+2. Once validated, mirror the same refinement contract around the native
+   multi-view generation node without merging image-turnaround responsibilities
+   into the reconstruction workflow.
+
+Deferred native modular slice:
+
+- consume the promoted `TRELLIS2_MLX_SPARSE_STRUCTURE` artifact in a standalone
+  shape-SLat generation node, stopping before shape decoding or mesh creation.
 
 ## Later pipeline stages
 
