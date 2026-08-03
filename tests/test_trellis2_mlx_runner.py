@@ -176,8 +176,8 @@ def test_single_image_manufacturing_workflow_wraps_complete_refinement_lane():
     assert source_for(final_preview, "model_file")[0] is scale
     assert source_for(final_save, "mesh")[0] is scale
 
-    assert voxel["widgets_values"] == [768]
-    assert scale["widgets_values"] == [250.0, "z", 768, 0.4, 0.2]
+    assert voxel["widgets_values"] == [1024]
+    assert scale["widgets_values"] == [250.0, "z", 1024, 0.4, 0.2]
     assert final_save["widgets_values"][0] == (
         "CFP/TRELLIS2_MLX_SINGLE_IMAGE_FINAL_250MM"
     )

@@ -13,7 +13,7 @@ from .topology_diagnostics import diagnose_ovoxel_topology
 
 
 MIN_TARGET_RESOLUTION = 32
-MAX_TARGET_RESOLUTION = 768
+MAX_TARGET_RESOLUTION = 1024
 MAX_ESTIMATED_GRID_VOXELS = 512**3
 
 

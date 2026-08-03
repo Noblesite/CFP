@@ -65,11 +65,11 @@ def test_print_scale_can_pass_detail_gate_at_large_voxel_resolution():
     _, report = scale_glb_for_print(
         _box(),
         target_height_mm=40.0,
-        source_voxel_resolution=768,
+        source_voxel_resolution=1024,
         nozzle_diameter_mm=0.4,
     )
 
-    assert report["feature_gate"]["voxel_pitch_mm"] == pytest.approx(40.0 / 768.0)
+    assert report["feature_gate"]["voxel_pitch_mm"] == pytest.approx(40.0 / 1024.0)
     assert report["feature_gate"]["status"] == "DETAIL_PASS"
     assert report["status"] == "SCALE_PASS"
 
@@ -79,7 +79,7 @@ def test_print_scale_can_pass_detail_gate_at_large_voxel_resolution():
     [
         ("target_height_mm", 0.0, "target_height_mm"),
         ("source_voxel_resolution", 12, "source_voxel_resolution"),
-        ("source_voxel_resolution", 769, "source_voxel_resolution"),
+        ("source_voxel_resolution", 1025, "source_voxel_resolution"),
         ("nozzle_diameter_mm", 0.01, "nozzle_diameter_mm"),
         ("layer_height_mm", 2.0, "layer_height_mm"),
         ("height_axis", "sideways", "height_axis"),

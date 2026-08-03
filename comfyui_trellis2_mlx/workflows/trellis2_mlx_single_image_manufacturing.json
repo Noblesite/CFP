@@ -761,7 +761,7 @@
     {
       "id": 12,
       "type": "Trellis2MLXVoxelRemeshCandidate",
-      "title": "VOXEL 768 — High-Detail Watertight Candidate",
+      "title": "VOXEL 1024 — High-Detail Watertight Candidate",
       "pos": [
         3750,
         100
@@ -828,13 +828,13 @@
         "Node name for S&R": "Trellis2MLXVoxelRemeshCandidate"
       },
       "widgets_values": [
-        768
+        1024
       ]
     },
     {
       "id": 13,
       "type": "Preview3D",
-      "title": "VOXEL 768 — Before Polish",
+      "title": "VOXEL 1024 — Before Polish",
       "pos": [
         4230,
         -80
@@ -903,7 +903,7 @@
     {
       "id": 16,
       "type": "Trellis2MLXTopologyDiagnostics",
-      "title": "VOXEL 768 — Diagnostics",
+      "title": "VOXEL 1024 — Diagnostics",
       "pos": [
         4230,
         380
@@ -1261,7 +1261,7 @@
       "widgets_values": [
         250,
         "z",
-        768,
+        1024,
         0.4,
         0.2
       ],
@@ -1794,7 +1794,7 @@
       "outputs": [],
       "properties": {},
       "widgets_values": [
-        "# TRELLIS.2 MLX — SINGLE IMAGE TO PRINT-SCALE MESH\n\nThis is the integrated **single-image manufacturing lane**.\n\n1. RMBG-2.0 isolates the subject.\n2. The mask-quality gate blocks suspicious alpha before MLX inference.\n3. TRELLIS.2 generates a geometry-only GLB.\n4. The exact untouched GLB is previewed, reported, and saved before mutation.\n5. Small disconnected floaters are filtered into a new artifact.\n6. The exact sanitizer input is previewed and diagnosed.\n7. Conservative topology sanitation creates another artifact.\n8. The background-geometry guard blocks unsafe voxel filling.\n9. A 768-cell watertight voxel candidate is created and reviewed.\n10. Conservative post-voxel polish runs without moving vertices.\n11. The result is scaled to 250 mm and checked against a 0.4 mm nozzle / 0.2 mm layer.\n\n**No stage overwrites the raw TRELLIS artifact.** The 768 tier is allowed only while its estimated dense grid remains within the 512³ safety budget. Gates may stop execution. Override a gate only after visual review. Geometry refinement does not preserve learned textures. This workflow does not auto-approve a mesh for printing."
+        "# TRELLIS.2 MLX — SINGLE IMAGE TO PRINT-SCALE MESH\n\nThis is the integrated **single-image manufacturing lane**.\n\n1. RMBG-2.0 isolates the subject.\n2. The mask-quality gate blocks suspicious alpha before MLX inference.\n3. TRELLIS.2 generates a geometry-only GLB.\n4. The exact untouched GLB is previewed, reported, and saved before mutation.\n5. Small disconnected floaters are filtered into a new artifact.\n6. The exact sanitizer input is previewed and diagnosed.\n7. Conservative topology sanitation creates another artifact.\n8. The background-geometry guard blocks unsafe voxel filling.\n9. A 1024-cell watertight voxel candidate is created and reviewed.\n10. Conservative post-voxel polish runs without moving vertices.\n11. The result is scaled to 250 mm and checked against a 0.4 mm nozzle / 0.2 mm layer.\n\n**No stage overwrites the raw TRELLIS artifact.** The 1024 tier is allowed only while its estimated dense grid remains within the 512³ safety budget. Gates may stop execution. Override a gate only after visual review. Geometry refinement does not preserve learned textures. This workflow does not auto-approve a mesh for printing."
       ],
       "color": "#493b1f",
       "bgcolor": "#6a5730",
@@ -2089,7 +2089,7 @@
     },
     {
       "id": 8,
-      "title": "08 — BACKGROUND GUARD + VOXEL 768",
+      "title": "08 — BACKGROUND GUARD + VOXEL 1024",
       "bounding": [
         3160,
         40,
