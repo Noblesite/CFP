@@ -70,6 +70,11 @@ from .post_voxel_polish import (
     polish_post_voxel_glb,
     post_voxel_polish_report_json,
 )
+from .surface_shading import (
+    format_surface_shading_report,
+    shade_surface_candidate_glb,
+    surface_shading_report_json,
+)
 from .print_scale import (
     format_print_scale_report,
     print_scale_report_json,
@@ -1557,6 +1562,72 @@ class Trellis2MLXPostVoxelTopologyPolish(IO.ComfyNode):
         )
 
 
+class Trellis2MLXSurfaceShadingCandidate(IO.ComfyNode):
+    @classmethod
+    def define_schema(cls):
+        return IO.Schema(
+            node_id="Trellis2MLXSurfaceShadingCandidate",
+            display_name="TRELLIS.2 MLX Surface Shading Candidate",
+            category="The Foundry/TRELLIS.2 MLX/Mesh",
+            description=(
+                "Create a separate display-only GLB with smooth, angle-limited, or unchanged "
+                "surface normals. Vertex positions and the manufacturing artifact are preserved."
+            ),
+            inputs=[
+                IO.File3DGLB.Input("model_3d"),
+                IO.Combo.Input(
+                    "mode",
+                    options=["smooth", "angle", "flat"],
+                    default="smooth",
+                ),
+                IO.Float.Input(
+                    "angle_degrees",
+                    default=30.0,
+                    min=0.0,
+                    max=180.0,
+                    step=1.0,
+                    tooltip=(
+                        "Used only in angle mode. Adjacent faces below this angle share smooth "
+                        "normals; sharper edges remain visually hard."
+                    ),
+                ),
+            ],
+            outputs=[
+                IO.File3DGLB.Output(display_name="shaded_preview_3d"),
+                IO.String.Output(display_name="shading_report"),
+                IO.String.Output(display_name="shading_report_json"),
+                IO.String.Output(display_name="status"),
+            ],
+        )
+
+    @classmethod
+    def execute(
+        cls,
+        model_3d: Types.File3D,
+        mode: str,
+        angle_degrees: float,
+    ):
+        output_data, report = shade_surface_candidate_glb(
+            model_3d.get_source(),
+            mode=mode,
+            angle_degrees=angle_degrees,
+        )
+        temp_directory = Path(folder_paths.get_temp_directory())
+        temp_directory.mkdir(parents=True, exist_ok=True)
+        output_path = (
+            temp_directory / f"trellis2_mlx_surface_shaded_{uuid.uuid4().hex}.glb"
+        )
+        output_path.write_bytes(output_data)
+        report_text = format_surface_shading_report(report)
+        return IO.NodeOutput(
+            Types.File3D(str(output_path), file_format="glb"),
+            report_text,
+            surface_shading_report_json(report),
+            report["status"],
+            ui={"text": [report_text]},
+        )
+
+
 class Trellis2MLXPrintScaleFeatureGate(IO.ComfyNode):
     @classmethod
     def define_schema(cls):
@@ -1713,6 +1784,7 @@ __all__ = [
     "Trellis2MLXBackgroundGeometryGuard",
     "Trellis2MLXVoxelRemeshCandidate",
     "Trellis2MLXPostVoxelTopologyPolish",
+    "Trellis2MLXSurfaceShadingCandidate",
     "Trellis2MLXPrintScaleFeatureGate",
     "Trellis2MLXVoxelCandidateComparison",
 ]

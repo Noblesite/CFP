@@ -151,6 +151,8 @@ def test_single_image_manufacturing_workflow_wraps_complete_refinement_lane():
     background_guard = node("Trellis2MLXBackgroundGeometryGuard")
     voxel = node("Trellis2MLXVoxelRemeshCandidate")
     polish = node("Trellis2MLXPostVoxelTopologyPolish")
+    shading = node("Trellis2MLXSurfaceShadingCandidate")
+    shading_preview = node("Preview3D", "SMOOTH SHADING — Display Preview Only")
     scale = node("Trellis2MLXPrintScaleFeatureGate")
     final_preview = node("Preview3D", "FINAL 250 mm — Print Preview")
     final_save = node("SaveGLB", "Save FINAL 250 mm Candidate")
@@ -172,11 +174,14 @@ def test_single_image_manufacturing_workflow_wraps_complete_refinement_lane():
     assert source_for(background_guard, "model_3d")[0] is sanitizer
     assert source_for(voxel, "model_3d")[0] is background_guard
     assert source_for(polish, "candidate_3d")[0] is voxel
+    assert source_for(shading, "model_3d")[0] is polish
+    assert source_for(shading_preview, "model_file")[0] is shading
     assert source_for(scale, "model_3d")[0] is polish
     assert source_for(final_preview, "model_file")[0] is scale
     assert source_for(final_save, "mesh")[0] is scale
 
     assert voxel["widgets_values"] == [1024]
+    assert shading["widgets_values"] == ["smooth", 30]
     assert scale["widgets_values"] == [250.0, "z", 1024, 0.4, 0.2]
     assert final_save["widgets_values"][0] == (
         "CFP/TRELLIS2_MLX_SINGLE_IMAGE_FINAL_250MM"
@@ -186,6 +191,49 @@ def test_single_image_manufacturing_workflow_wraps_complete_refinement_lane():
         candidate["type"] == "Trellis2MLXMultiViewTo3D"
         for candidate in workflow["nodes"]
     )
+
+
+def test_surface_shading_workflow_preserves_before_preview_and_saves_candidate():
+    workflow_path = (
+        Path(__file__).parents[1]
+        / "comfyui_trellis2_mlx"
+        / "workflows"
+        / "trellis2_mlx_surface_shading.json"
+    )
+    workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
+    nodes = {node["id"]: node for node in workflow["nodes"]}
+    links = {link[0]: link for link in workflow["links"]}
+
+    shading = next(
+        node
+        for node in workflow["nodes"]
+        if node["type"] == "Trellis2MLXSurfaceShadingCandidate"
+    )
+    generator = next(
+        node for node in workflow["nodes"] if node["type"] == "Trellis2MLXImageTo3D"
+    )
+    before = next(
+        node
+        for node in workflow["nodes"]
+        if node.get("title") == "BEFORE — Geometric Surface"
+    )
+    after = next(
+        node
+        for node in workflow["nodes"]
+        if node.get("title") == "AFTER — Smooth Surface Normals"
+    )
+    save = next(node for node in workflow["nodes"] if node["type"] == "SaveGLB")
+
+    shading_link = links[shading["inputs"][0]["link"]]
+    before_link = links[next(i for i in before["inputs"] if i["name"] == "model_file")["link"]]
+    after_link = links[next(i for i in after["inputs"] if i["name"] == "model_file")["link"]]
+    save_link = links[next(i for i in save["inputs"] if i["name"] == "mesh")["link"]]
+
+    assert nodes[shading_link[1]] is generator
+    assert nodes[before_link[1]] is generator
+    assert nodes[after_link[1]] is shading
+    assert nodes[save_link[1]] is shading
+    assert shading["widgets_values"] == ["smooth", 30]
 
 
 @pytest.mark.parametrize(

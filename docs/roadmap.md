@@ -48,7 +48,10 @@ Completed integrated workbench:
 - the single-image manufacturing workflow combines RMBG, input-mask gating,
   geometry-only TRELLIS reconstruction, immutable raw review/export, floater
   filtering, sanitation, background-geometry protection, guarded 1024-cell voxel
-  refinement, conservative polish, print scaling, final review, and export;
+  refinement, conservative polish, a display-only smooth-normal branch, print
+  scaling, final review, and export;
+- the separate surface-shading workflow compares flat, smooth, and angle-limited
+  display normals without changing the manufacturing artifact;
 - the voxel-resolution A/B experiment remains separate so the production lane
   has one deterministic refinement path.
 

@@ -103,6 +103,8 @@ cp "$node_source/workflows/trellis2_mlx_voxel_resolution_ab.json" \
     "$workflow_dir/CFP_TRELLIS2_MLX_Voxel_Resolution_AB_v001.json"
 cp "$node_source/workflows/trellis2_mlx_post_voxel_polish.json" \
     "$workflow_dir/CFP_TRELLIS2_MLX_Post_Voxel_Polish_v001.json"
+cp "$node_source/workflows/trellis2_mlx_surface_shading.json" \
+    "$workflow_dir/CFP_TRELLIS2_MLX_Surface_Shading_v001.json"
 cp "$node_source/workflows/trellis2_mlx_print_scale_gate.json" \
     "$workflow_dir/CFP_TRELLIS2_MLX_Print_Scale_Gate_v001.json"
 cp "$node_source/workflows/trellis2_mlx_background_geometry_guard.json" \

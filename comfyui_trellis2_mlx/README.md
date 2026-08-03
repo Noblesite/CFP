@@ -56,9 +56,14 @@ this stage has a report rather than a 3D mesh preview.
 workbench. It combines RMBG-2.0, the input-mask quality gate, geometry-only
 TRELLIS reconstruction, immutable raw preview/report/export, floater removal,
 pre-sanitizer preview and diagnostics, conservative sanitation, the background
-geometry gate, guarded 1024-cell watertight voxel refinement, post-voxel polish, and a
-250 mm print-scale feature gate. Every transformation writes a distinct
+geometry gate, guarded 1024-cell watertight voxel refinement, post-voxel polish,
+non-destructive surface-shading preview, and a 250 mm print-scale feature gate.
+Every transformation writes a distinct
 artifact; the raw TRELLIS GLB is never overwritten or silently promoted.
+
+`TRELLIS.2 MLX Surface Shading` is the single-purpose display workflow. It
+compares the original geometry against smooth, angle-limited, or unchanged
+normals and saves a separate GLB without moving vertices.
 
 ## Install
 

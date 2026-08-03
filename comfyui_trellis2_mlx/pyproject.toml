@@ -1,6 +1,6 @@
 [project]
 name = "comfyui-trellis2-mlx"
-version = "0.21.0"
+version = "0.22.0"
 description = "Native Swift/MLX TRELLIS.2 image-to-3D nodes for ComfyUI on Apple Silicon"
 requires-python = ">=3.12"
 dependencies = [

@@ -18,6 +18,7 @@ async def comfy_entrypoint():
         Trellis2MLXTopologySanitizer,
         Trellis2MLXBackgroundGeometryGuard,
         Trellis2MLXPostVoxelTopologyPolish,
+        Trellis2MLXSurfaceShadingCandidate,
         Trellis2MLXPrintScaleFeatureGate,
         Trellis2MLXVoxelRemeshCandidate,
         Trellis2MLXVoxelCandidateComparison,
@@ -43,6 +44,7 @@ async def comfy_entrypoint():
                 Trellis2MLXBackgroundGeometryGuard,
                 Trellis2MLXVoxelRemeshCandidate,
                 Trellis2MLXPostVoxelTopologyPolish,
+                Trellis2MLXSurfaceShadingCandidate,
                 Trellis2MLXPrintScaleFeatureGate,
                 Trellis2MLXVoxelCandidateComparison,
             ]
