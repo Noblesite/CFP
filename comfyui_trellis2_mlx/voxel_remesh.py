@@ -12,6 +12,38 @@ from .mesh_report import _load_mesh, _read_artifact, analyze_glb
 from .topology_diagnostics import diagnose_ovoxel_topology
 
 
+MIN_TARGET_RESOLUTION = 32
+MAX_TARGET_RESOLUTION = 768
+MAX_ESTIMATED_GRID_VOXELS = 512**3
+
+
+def _voxel_grid_plan(
+    extents: np.ndarray,
+    target_resolution: int,
+) -> tuple[float, np.ndarray, int]:
+    """Plan a voxel grid while retaining a bounded worst-case memory contract."""
+    if not MIN_TARGET_RESOLUTION <= target_resolution <= MAX_TARGET_RESOLUTION:
+        raise ValueError(
+            "target_resolution must be between "
+            f"{MIN_TARGET_RESOLUTION} and {MAX_TARGET_RESOLUTION}"
+        )
+
+    max_extent = float(np.max(extents))
+    if max_extent <= 0:
+        raise ValueError("Cannot voxel-remesh a zero-size mesh")
+
+    pitch = max_extent / float(target_resolution)
+    estimated_shape = np.ceil(extents / pitch).astype(np.int64) + 3
+    estimated_voxels = int(np.prod(estimated_shape, dtype=np.int64))
+    if estimated_voxels > MAX_ESTIMATED_GRID_VOXELS:
+        raise ValueError(
+            "Requested voxel grid exceeds the safe dense-grid budget: "
+            f"{estimated_voxels:,} > {MAX_ESTIMATED_GRID_VOXELS:,}. "
+            "Reduce target_resolution or process a narrower isolated part."
+        )
+    return pitch, estimated_shape, estimated_voxels
+
+
 def _deterministic_sample(points: np.ndarray, limit: int = 20_000) -> np.ndarray:
     if len(points) <= limit:
         return points
@@ -61,25 +93,14 @@ def voxel_remesh_candidate_glb(
     target_resolution: int = 192,
 ) -> tuple[bytes, dict[str, object]]:
     """Create a separate filled-voxel marching-cubes candidate."""
-    if not 32 <= target_resolution <= 512:
-        raise ValueError("target_resolution must be between 32 and 512")
-
     artifact_path, input_data = _read_artifact(source)
     source_mesh = _load_mesh(input_data)
     source_vertices = np.asarray(source_mesh.vertices, dtype=np.float64)
     extents = np.asarray(source_mesh.extents, dtype=np.float64)
-    max_extent = float(np.max(extents))
-    if max_extent <= 0:
-        raise ValueError("Cannot voxel-remesh a zero-size mesh")
-
-    pitch = max_extent / float(target_resolution)
-    estimated_shape = np.ceil(extents / pitch).astype(np.int64) + 3
-    estimated_voxels = int(np.prod(estimated_shape, dtype=np.int64))
-    max_voxels = 512**3
-    if estimated_voxels > max_voxels:
-        raise ValueError(
-            f"Requested voxel grid is too large: {estimated_voxels:,} > {max_voxels:,}"
-        )
+    pitch, estimated_shape, estimated_voxels = _voxel_grid_plan(
+        extents,
+        target_resolution,
+    )
 
     voxel_grid = source_mesh.voxelized(pitch=pitch, method="subdivide")
     surface_voxels = int(voxel_grid.filled_count)
@@ -203,6 +224,9 @@ def voxel_remesh_report_json(report: dict[str, object]) -> str:
 
 
 __all__ = [
+    "MAX_ESTIMATED_GRID_VOXELS",
+    "MAX_TARGET_RESOLUTION",
+    "MIN_TARGET_RESOLUTION",
     "format_voxel_remesh_report",
     "voxel_remesh_candidate_glb",
     "voxel_remesh_report_json",

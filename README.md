@@ -85,7 +85,7 @@ artifact by explicit path, validates its CFP schema, samples and decodes the
 The single-image manufacturing workflow wraps the complete current production
 lane into one drag-and-drop graph: RMBG and mask gating, geometry-only TRELLIS
 generation, immutable raw review/export, conservative cleanup and diagnostics,
-background-geometry protection, 256-cell voxel refinement and polish, physical
+background-geometry protection, guarded 768-cell voxel refinement and polish, physical
 print scaling, final review, and GLB export.
 
 Native generation nodes are repeat-safe: unchanged queued requests bypass

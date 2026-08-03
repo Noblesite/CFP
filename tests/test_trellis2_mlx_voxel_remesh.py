@@ -2,11 +2,14 @@ from __future__ import annotations
 
 from io import BytesIO
 
+import numpy as np
 import pytest
 import trimesh
 
 from comfyui_trellis2_mlx.mesh_report import analyze_glb
 from comfyui_trellis2_mlx.voxel_remesh import (
+    MAX_ESTIMATED_GRID_VOXELS,
+    _voxel_grid_plan,
     format_voxel_remesh_report,
     voxel_remesh_candidate_glb,
     voxel_remesh_report_json,
@@ -48,7 +51,23 @@ def test_voxel_remesh_preserves_source_artifact_as_separate_candidate():
     assert report["limitations"][0].startswith("This is a separate candidate")
 
 
-@pytest.mark.parametrize("resolution", [31, 513])
+def test_voxel_grid_plan_allows_768_for_slender_character_within_memory_budget():
+    pitch, estimated_shape, estimated_voxels = _voxel_grid_plan(
+        np.asarray([0.35, 0.2, 1.0]),
+        768,
+    )
+
+    assert pitch == pytest.approx(1.0 / 768.0)
+    assert estimated_shape.tolist() == [272, 157, 771]
+    assert estimated_voxels < MAX_ESTIMATED_GRID_VOXELS
+
+
+def test_voxel_grid_plan_rejects_768_cube_above_dense_memory_budget():
+    with pytest.raises(ValueError, match="safe dense-grid budget"):
+        _voxel_grid_plan(np.ones(3), 768)
+
+
+@pytest.mark.parametrize("resolution", [31, 769])
 def test_voxel_remesh_rejects_resolution_outside_guardrails(resolution):
     with pytest.raises(ValueError, match="target_resolution"):
         voxel_remesh_candidate_glb(

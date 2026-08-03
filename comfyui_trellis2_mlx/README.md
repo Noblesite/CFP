@@ -56,7 +56,7 @@ this stage has a report rather than a 3D mesh preview.
 workbench. It combines RMBG-2.0, the input-mask quality gate, geometry-only
 TRELLIS reconstruction, immutable raw preview/report/export, floater removal,
 pre-sanitizer preview and diagnostics, conservative sanitation, the background
-geometry gate, 256-cell watertight voxel refinement, post-voxel polish, and a
+geometry gate, guarded 768-cell watertight voxel refinement, post-voxel polish, and a
 250 mm print-scale feature gate. Every transformation writes a distinct
 artifact; the raw TRELLIS GLB is never overwritten or silently promoted.
 

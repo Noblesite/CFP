@@ -33,8 +33,8 @@ def scale_glb_for_print(
     """Scale a GLB to a target physical height and report its voxel detail budget."""
     if not 1.0 <= target_height_mm <= 5000.0:
         raise ValueError("target_height_mm must be between 1 and 5000")
-    if not 32 <= source_voxel_resolution <= 512:
-        raise ValueError("source_voxel_resolution must be between 32 and 512")
+    if not 32 <= source_voxel_resolution <= 768:
+        raise ValueError("source_voxel_resolution must be between 32 and 768")
     if not 0.1 <= nozzle_diameter_mm <= 2.0:
         raise ValueError("nozzle_diameter_mm must be between 0.1 and 2.0")
     if not 0.02 <= layer_height_mm <= 1.0:

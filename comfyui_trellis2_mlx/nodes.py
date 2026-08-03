@@ -1477,7 +1477,7 @@ class Trellis2MLXVoxelRemeshCandidate(IO.ComfyNode):
                     "target_resolution",
                     default=192,
                     min=32,
-                    max=512,
+                    max=768,
                     step=16,
                     tooltip=(
                         "Voxel cells across the longest mesh dimension. Higher values preserve "
@@ -1591,7 +1591,7 @@ class Trellis2MLXPrintScaleFeatureGate(IO.ComfyNode):
                     "source_voxel_resolution",
                     default=256,
                     min=32,
-                    max=512,
+                    max=768,
                     step=16,
                 ),
                 IO.Float.Input(
